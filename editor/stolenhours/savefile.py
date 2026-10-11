@@ -269,6 +269,34 @@ class SaveFile:
             raise SaveFileError(f"unknown life id {life_id}")
         self.dirty = True
 
+    # ---- appearance ------------------------------------------------------------
+    @property
+    def _body(self) -> dict:
+        return self.sd["m_AvatarStatus"]["playerP"][0]["BodyParam"]
+
+    def appearance(self) -> dict:
+        return dict(self._body)
+
+    def set_appearance(self, field: str, value) -> None:
+        """Name fields must keep the current ID's shape (same length, same prefix up to the last 2 chars).
+
+        The list of IDs the game accepts lives in its pak data and is not checked here (UNVERIFIED).
+        """
+        body = self._body
+        if field not in body:
+            raise SaveFileError(f"unknown appearance field {field}; one of {', '.join(body)}")
+        cur = body[field]
+        if isinstance(cur, int):
+            value = int(value)
+            if not 0 <= value <= 0xFF:
+                raise SaveFileError(f"{field} is a u8 (0..255)")
+        else:
+            value = str(value)
+            if not isinstance(cur, str) or len(value) != len(cur) or value[:-2] != cur[:-2] or not value[-2:].isdigit():
+                raise SaveFileError(f"{field} must look like {cur[:-2]}NN (current {cur})")
+        body[field] = value
+        self.dirty = True
+
     # ---- inventory -------------------------------------------------------------
     @property
     def inventory(self) -> dict:
@@ -354,6 +382,9 @@ class SaveFile:
         """Write to the save (default: the file it was loaded from). Game must be closed; backup first."""
         target = Path(target or self.path)
         safety.require_game_closed()
+        if target == self.path and target.exists() and target.read_bytes() != self.raw:
+            raise SaveFileError("the save changed on disk since it was loaded (the game saved?). "
+                                "Reload it and redo the edit so newer progress is not overwritten.")
         out = self.to_bin()
         backup = safety.backup(target, "before-edit") if target.exists() else None
         safety.atomic_write(target, out)

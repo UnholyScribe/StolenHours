@@ -7,7 +7,8 @@
 param(
     [string]$GameDir = "",
     [switch]$Uninstall,
-    [switch]$KeepEAC
+    [switch]$KeepEAC,
+    [switch]$ModOnly
 )
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -24,7 +25,8 @@ $Dist = Join-Path $Root "tools\ue4ss\dist"
 $ModSrc = Join-Path $PSScriptRoot "ue4ss_mod\StolenHours"
 $ShippingRel = "Game\Binaries\Win64\NFL1-Win64-Shipping.exe"
 
-if (Get-Process -Name "NFL1-Win64-Shipping", "NFL1", "EACLauncher" -ErrorAction SilentlyContinue) {
+# Lua mod files are only read at startup (or on UE4SS hot reload, Ctrl+R), so -ModOnly is safe while the game runs.
+if (-not $ModOnly -and (Get-Process -Name "NFL1-Win64-Shipping", "NFL1", "EACLauncher" -ErrorAction SilentlyContinue)) {
     throw "Game is running. Close it first."
 }
 if (-not (Test-Path (Join-Path $Win64 "NFL1-Win64-Shipping.exe"))) { throw "Game not found in $GameDir" }
@@ -55,6 +57,18 @@ if ($Uninstall) {
     return
 }
 
+New-Item -ItemType Directory -Force (Join-Path $env:LOCALAPPDATA "StolenHours\live"), (Join-Path $env:LOCALAPPDATA "StolenHours\dumps") | Out-Null
+
+if ($ModOnly) {
+    $ModsDir = Join-Path $Win64 "ue4ss\Mods"
+    if (-not (Test-Path $ModsDir)) { throw "UE4SS is not installed; run without -ModOnly first" }
+    $Dest = Join-Path $ModsDir "StolenHours"
+    if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
+    Copy-Item $ModSrc $ModsDir -Recurse -Force
+    "Updated StolenHours mod in $ModsDir"
+    return
+}
+
 if (-not (Test-Path (Join-Path $Dist "dwmapi.dll"))) { throw "UE4SS not found in $Dist" }
 
 if (-not $KeepEAC) {
@@ -72,6 +86,8 @@ if (-not $KeepEAC) {
 Backup-File (Join-Path $Win64 "dwmapi.dll")
 Copy-Item (Join-Path $Dist "dwmapi.dll") $Win64 -Force
 Copy-Item (Join-Path $Dist "ue4ss") $Win64 -Recurse -Force
+$Settings = Join-Path $Win64 "ue4ss\UE4SS-settings.ini"
+(Get-Content $Settings) -replace "^EnableHotReloadSystem = 0", "EnableHotReloadSystem = 1" | Set-Content $Settings
 $ModsDir = Join-Path $Win64 "ue4ss\Mods"
 Copy-Item $ModSrc $ModsDir -Recurse -Force
 $ModsTxt = Join-Path $ModsDir "mods.txt"

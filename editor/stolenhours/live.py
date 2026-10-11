@@ -27,6 +27,7 @@ class LiveBridge:
     def __init__(self, live_dir: Path | None = None):
         self.dir = Path(live_dir or paths.LIVE_DIR)
         self.dir.mkdir(parents=True, exist_ok=True)
+        paths.DUMPS_DIR.mkdir(parents=True, exist_ok=True)
         self.cmd = self.dir / "cmd.txt"
         self.ack = self.dir / "ack.txt"
         self.heartbeat = self.dir / "heartbeat.txt"
@@ -49,7 +50,7 @@ class LiveBridge:
             time.sleep(0.05)
         cid = uuid.uuid4().hex[:12]
         tmp = self.cmd.with_suffix(".tmp")
-        tmp.write_text("\t".join((cid, verb, *args)) + "\n", encoding="utf-8")
+        tmp.write_bytes(("\t".join((cid, verb, *args)) + "\n").encode("utf-8"))
         os.replace(tmp, self.cmd)
         while time.time() < deadline:
             try:
@@ -85,3 +86,9 @@ class LiveBridge:
 
     def list_props(self, target: str) -> Reply:
         return self.send("LIST_PROPS", target, timeout=20)
+
+    def dump(self) -> Reply:
+        return self.send("DUMP", timeout=900)
+
+    def dump_builtin(self) -> Reply:
+        return self.send("DUMP_BUILTIN", timeout=1800)

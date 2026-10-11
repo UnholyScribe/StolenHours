@@ -47,6 +47,7 @@ class App(tk.Tk):
         self._build_overview(nb)
         self._build_lives(nb)
         self._build_inventory(nb)
+        self._build_appearance(nb)
         self._build_live(nb)
 
         self._ui_queue: queue.SimpleQueue = queue.SimpleQueue()
@@ -125,6 +126,17 @@ class App(tk.Tk):
         ttk.Entry(ed, textvariable=self.add_query, width=28).pack(side="left", padx=4)
         ttk.Button(ed, text="Add", command=self.add_item).pack(side="left")
 
+    def _build_appearance(self, nb):
+        outer = ttk.Frame(nb, padding=12)
+        nb.add(outer, text="Appearance")
+        ttk.Label(outer, wraplength=900, text=(
+            "IDs must keep their current shape (e.g. color_hair_NN). Which IDs exist in game is not checked; "
+            "an unknown ID may break the character. Every save write makes a backup first.")).pack(anchor="w")
+        self.app_frame = ttk.Frame(outer)
+        self.app_frame.pack(anchor="w", pady=6)
+        self.app_vars: dict[str, tk.StringVar] = {}
+        ttk.Button(outer, text="Apply", command=self.apply_appearance).pack(anchor="w")
+
     def _build_live(self, nb):
         f = ttk.Frame(nb, padding=6)
         nb.add(f, text="Live (game running)")
@@ -146,7 +158,8 @@ class App(tk.Tk):
                          ("Find property", lambda: self.bridge.find_prop(self.live_prop.get())),
                          ("Get", lambda: self.bridge.get(self.live_target.get(), self.live_prop.get())),
                          ("Set", lambda: self.bridge.set(self.live_target.get(), self.live_prop.get(), self.live_value.get())),
-                         ("List props", lambda: self.bridge.list_props(self.live_target.get()))):
+                         ("List props", lambda: self.bridge.list_props(self.live_target.get())),
+                         ("Dump everything", self._dump_and_analyze)):
             ttk.Button(btns, text=text, command=lambda fn=fn: self.run_live(fn)).pack(side="left", padx=2)
         self.live_out = tk.Text(f, height=20)
         self.live_out.pack(fill="both", expand=True, pady=6)
@@ -191,6 +204,18 @@ class App(tk.Tk):
         self.lives_tv.delete(*self.lives_tv.get_children())
         for l in sf.lives():
             self.lives_tv.insert("", "end", iid=l["id"], values=(l["id"], l["name"], l["level"], l["exp"], l["rank"], l["star"]))
+        app = sf.appearance()
+        if set(app) != set(self.app_vars):
+            for w in self.app_frame.winfo_children():
+                w.destroy()
+            self.app_vars = {}
+            for r, k in enumerate(app):
+                self.app_vars[k] = tk.StringVar()
+                ttk.Label(self.app_frame, text=k).grid(row=r % 11, column=(r // 11) * 2, sticky="w", padx=(0, 6), pady=1)
+                ttk.Entry(self.app_frame, textvariable=self.app_vars[k], width=22).grid(
+                    row=r % 11, column=(r // 11) * 2 + 1, sticky="w", padx=(0, 18))
+        for k, v in app.items():
+            self.app_vars[k].set(str(v))
         cats = sf.inventory_categories()
         self.cat_cb.config(values=cats)
         if self.cat_var.get() not in cats:
@@ -223,6 +248,14 @@ class App(tk.Tk):
                 self.sf.character_name = self.ov["name"].get()
             if int(self.ov["money"].get()) != self.sf.money:
                 self.sf.money = int(self.ov["money"].get())
+        self._edit(f)
+
+    def apply_appearance(self):
+        def f():
+            cur = self.sf.appearance()
+            for k, var in self.app_vars.items():
+                if var.get() != str(cur[k]):
+                    self.sf.set_appearance(k, var.get())
         self._edit(f)
 
     def on_life_select(self, _):
@@ -272,6 +305,20 @@ class App(tk.Tk):
                 return
             self.ui(lambda: (self.status.set(f"saved; backup at {res['backup']}"), self.update_save_button()))
         threading.Thread(target=work, daemon=True).start()
+
+    def _dump_and_analyze(self) -> live.Reply:
+        """Runs on a worker thread (via run_live)."""
+        from . import dumpscan
+        r = self.bridge.dump()
+        if not r.ok or not self.sf:
+            return r
+        path = dumpscan.latest_dump()
+        targets = dumpscan.save_targets(self.sf)
+        text = dumpscan.format_report(dumpscan.analyze(path, targets), targets)
+        report = path.with_name(path.name.replace("values_", "report_"))
+        report.write_text(text, encoding="utf-8")
+        return live.Reply(True, r.text + " | report " + str(report) + " | " +
+                          text.split("== Game-code properties")[0].replace("\n", " | "))
 
     def run_live(self, fn):
         def work():

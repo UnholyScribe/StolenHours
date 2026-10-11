@@ -111,6 +111,20 @@ def cmd_add_item(args):
     _finish(sf, args)
 
 
+def cmd_appearance(args):
+    sf = _load(args)
+    for k, v in sf.appearance().items():
+        print(f"{k:24} {v}")
+
+
+def cmd_set_appearance(args):
+    sf = _load(args)
+    old = sf.appearance()[args.field] if args.field in sf.appearance() else None
+    sf.set_appearance(args.field, args.value)
+    print(f"{args.field} {old} -> {sf.appearance()[args.field]}")
+    _finish(sf, args)
+
+
 def cmd_unpack(args):
     up = container.unpack(Path(args.input).read_bytes(), container.load_key())
     Path(args.output).write_bytes(up.gvas)
@@ -161,12 +175,41 @@ def cmd_live(args):
         print("mod heartbeat:", "alive" if b.mod_alive() else "none")
         print("game processes:", ", ".join(safety.running_game_processes()) or "none")
         return
+    if verb in ("dump", "dump-all"):
+        print("dumping on the game thread; the game freezes until it finishes...", file=sys.stderr)
+        r = b.dump()
+        print(("OK  " if r.ok else "ERR ") + r.text.replace(" | ", "\n    "))
+        if verb == "dump-all":
+            print("running UE4SS built-in dumpers (objects, C++ SDK, usmap)...", file=sys.stderr)
+            r2 = b.dump_builtin()
+            print(("OK  " if r2.ok else "ERR ") + r2.text)
+        if r.ok:
+            _analyze(args, None)
+        return
     fn = {"ping": lambda: b.ping(), "find": lambda: b.find_prop(args.args[0]),
           "get": lambda: b.get(args.args[0], args.args[1]),
           "set": lambda: b.set(args.args[0], args.args[1], args.args[2]),
           "props": lambda: b.list_props(args.args[0])}[verb]
     r = fn()
     print(("OK  " if r.ok else "ERR ") + r.text.replace(" | ", "\n    "))
+
+
+def _analyze(args, dump_file):
+    from . import dumpscan
+    path = Path(dump_file) if dump_file else dumpscan.latest_dump()
+    if not path or not path.exists():
+        sys.exit(f"no value dump found in {paths.DUMPS_DIR}")
+    sf = _load(args)
+    targets = dumpscan.save_targets(sf)
+    text = dumpscan.format_report(dumpscan.analyze(path, targets), targets)
+    report = path.with_name(path.name.replace("values_", "report_"))
+    report.write_text(text, encoding="utf-8")
+    head = text.split("== Game-code properties")[0]
+    print(head.rstrip() + f"\n\nfull report: {report}")
+
+
+def cmd_analyze_dump(args):
+    _analyze(args, args.file)
 
 
 def cmd_where(args):
@@ -224,6 +267,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("category"); p.add_argument("index", type=int); p.add_argument("stock", type=int)
     p = edit("add-item", cmd_add_item, "add an item to an inventory category")
     p.add_argument("category"); p.add_argument("item_id"); p.add_argument("stock", type=int, nargs="?", default=1)
+    sub.add_parser("appearance", help="show appearance fields").set_defaults(fn=cmd_appearance)
+    p = edit("set-appearance", cmd_set_appearance, "set one appearance field (e.g. HairColorId color_hair_05)")
+    p.add_argument("field"); p.add_argument("value")
     p = edit("import-json", cmd_import_json, "replace save contents from exported JSON"); p.add_argument("input")
 
     p = sub.add_parser("export-json", help="dump the parsed save to JSON"); p.add_argument("output"); p.set_defaults(fn=cmd_export_json)
@@ -232,8 +278,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("backup", help="back up the save with SHA-256"); p.add_argument("--reason", default="manual"); p.set_defaults(fn=cmd_backup)
     p = sub.add_parser("restore", help="restore a backup .bin over the save"); p.add_argument("backup_file"); p.set_defaults(fn=cmd_restore)
     p = sub.add_parser("live", help="Mode B: talk to the in-game mod")
-    p.add_argument("verb", choices=["status", "ping", "find", "get", "set", "props"]); p.add_argument("args", nargs="*")
+    p.add_argument("verb", choices=["status", "ping", "find", "get", "set", "props", "dump", "dump-all"])
+    p.add_argument("args", nargs="*")
     p.set_defaults(fn=cmd_live)
+    p = sub.add_parser("analyze-dump", help="cross-reference a live value dump with the save")
+    p.add_argument("file", nargs="?", help="values_*.txt (default: newest)"); p.set_defaults(fn=cmd_analyze_dump)
     p = sub.add_parser("where", help="show the detected Steam, game and save locations")
     p.add_argument("--game-dir", action="store_true", help="print only the game folder (for scripts)")
     p.set_defaults(fn=cmd_where)

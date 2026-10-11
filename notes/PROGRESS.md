@@ -27,7 +27,20 @@
   `loginusers.vdf` to pick the default. Env overrides. `where` command; GUI save dropdown; install script auto-detects.
 - 9 new tests on fake Steam layouts (other drive, renamed folder, old VDF format, no registry, no Steam). 28 total pass.
 
+## 2026-10-11: Dump feature, first live contact (Tock)
+- Mod 0.2.0: `DUMP` (values of every DP1Project / `/Game` object + singletons with engine fields, schema of all
+  DP1Project classes/structs/enums with offsets), `DUMP_BUILTIN` (UE4SS object dump, C++ SDK, usmap), Ctrl+F9 in game.
+  `FIND_PROP` now also searches structs.
+- Editor: `live dump`, `live dump-all`, `analyze-dump` (cross-references the dump with the save: Money, name, island,
+  life levels/exp, getOrderCount; lists game properties with stat-like names). GUI "Dump everything" button.
+- Mod is now tested by running the real Lua in Lua 5.4 (lupa) against a mocked UE4SS API (`editor\tests\lua_mock.lua`).
+  That caught a CRLF bug in the mailbox that would have broken every command. 38 tests pass.
+- In game: UE4SS loads, mod 0.1.0 answered PING. `Money` not on any reflected class; `SaveData` class is reflected.
+- Mod 0.2.0 copied into the game; UE4SS hot reload enabled (Ctrl+R). Needs one game restart to take effect.
+- Stale-save guard: writes refuse if the save changed on disk since it was loaded. Appearance editing added.
+
 ## Next
+- Unholy: restart the game once, load the save. Tock: `live dump`, read the report, find the live owner of Money.
 - Unholy: first real edit (e.g. `set-money`), launch, confirm Dosh in game. Then try `add-item`.
 - Unholy: compare the Life menu with `StolenHours.cmd lives` to confirm life id names.
 - Unholy: launch through Steam, load the save. Then Tock reads `ue4ss\UE4SS.log` and runs `live ping`, `live find Money`.

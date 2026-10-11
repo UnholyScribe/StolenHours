@@ -66,6 +66,20 @@ def test_life_edit(loaded):
         sf.set_life("life9999", level=1)
 
 
+def test_appearance_edit(loaded):
+    sf = fresh(loaded)
+    assert sf.appearance()["HairColorId"] == "color_hair_27"
+    sf.set_appearance("HairColorId", "color_hair_05")
+    sf.set_appearance("EyeScaleIndex", 3)
+    for bad in (("HairColorId", "color_eye_05"), ("HairColorId", "color_hair_5"), ("EyeScaleIndex", 256),
+                ("Nope", 1)):
+        with pytest.raises(savefile.SaveFileError):
+            sf.set_appearance(*bad)
+    d = savefile.parse_gvas(container.unpack(sf.to_bin(), sf.key).gvas)
+    body = d["saveData"]["m_AvatarStatus"]["playerP"][0]["BodyParam"]
+    assert body["HairColorId"] == "color_hair_05" and body["EyeScaleIndex"] == 3
+
+
 def test_unicode_name(loaded):
     sf = fresh(loaded)
     sf.character_name = "Tøck"
@@ -85,6 +99,19 @@ def test_write_makes_backup(loaded, tmp_path, monkeypatch):
     backup = next((tmp_path / "backups").rglob(paths.SAVE_FILE_NAME))
     assert backup.read_bytes() == SAMPLE_SAVE.read_bytes()
     assert res["sha256"] == safety.sha256_file(target)
+
+
+def test_write_refuses_stale_load(loaded, tmp_path, monkeypatch):
+    target = tmp_path / paths.SAVE_FILE_NAME
+    shutil.copy2(SAMPLE_SAVE, target)
+    monkeypatch.setattr(paths, "BACKUP_ROOT", tmp_path / "backups")
+    monkeypatch.setattr(safety, "running_game_processes", lambda: [])
+    sf = savefile.SaveFile.load(target, loaded.key)
+    target.write_bytes(container.pack(b"GVAS changed by the game", loaded.key))
+    sf.money = 1
+    with pytest.raises(savefile.SaveFileError, match="changed on disk"):
+        sf.write()
+    assert not (tmp_path / "backups").exists()
 
 
 def test_write_locked_while_game_runs(loaded, tmp_path, monkeypatch):

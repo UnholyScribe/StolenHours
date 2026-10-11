@@ -7,8 +7,9 @@ local LIVE_DIR = (os.getenv("LOCALAPPDATA") or ".") .. "\\StolenHours\\live\\"
 local CMD = LIVE_DIR .. "cmd.txt"
 local ACK = LIVE_DIR .. "ack.txt"
 local HEARTBEAT = LIVE_DIR .. "heartbeat.txt"
-local VERSION = "0.1.0"
+local VERSION = "0.2.0"
 local busy = false
+local Dump = require("stolenhours_dump")
 
 local function split_tabs(s)
     local out = {}
@@ -75,12 +76,19 @@ handlers.FIND_PROP = function(args)
     if not want or want == "" then return false, "usage: FIND_PROP <name>" end
     local class_class = StaticFindObject("/Script/CoreUObject.Class")
     if not class_class or not class_class:IsValid() then return false, "engine not ready" end
+    local struct_class = StaticFindObject("/Script/CoreUObject.ScriptStruct")
     local lines, classes = {}, {}
     ForEachUObject(function(obj)
-        if obj:IsA(class_class) then
+        local is_class = obj:IsA(class_class)
+        local is_struct = struct_class and struct_class:IsValid() and obj:IsA(struct_class)
+        if is_class or is_struct then
             obj:ForEachProperty(function(prop)
                 if prop:GetFName():ToString() == want then
-                    classes[#classes + 1] = obj
+                    if is_class then
+                        classes[#classes + 1] = obj
+                    else
+                        lines[#lines + 1] = "struct " .. obj:GetFullName() .. " (values: use DUMP)"
+                    end
                 end
             end)
         end
@@ -132,11 +140,30 @@ handlers.LIST_PROPS = function(args)
     return true, table.concat(lines, " | ")
 end
 
+-- DUMP : values + schema files in %LOCALAPPDATA%\StolenHours\dumps\
+handlers.DUMP = function()
+    local stamp = os.date("%Y%m%d_%H%M%S")
+    local ok1, r1 = Dump.values(stamp)
+    local ok2, r2 = Dump.schema(stamp)
+    return ok1 and ok2, "values " .. r1 .. " | schema " .. r2
+end
+
+-- Run outside the game thread (UE4SS's own dumpers manage their own threading).
+local async_handlers = {
+    DUMP_BUILTIN = function() return Dump.builtin() end,
+}
+
 local function dispatch(line)
     local f = split_tabs(line)
     local id, verb = f[1] or "?", f[2] or ""
     local args = {}
     for i = 3, #f do args[#args + 1] = f[i] end
+    if async_handlers[verb] then
+        local ok, res, text = pcall(async_handlers[verb], args)
+        if ok then reply(id, res, text) else reply(id, false, res) end
+        busy = false
+        return
+    end
     local h = handlers[verb]
     if not h then
         reply(id, false, "unknown command " .. verb)
@@ -165,11 +192,20 @@ LoopAsync(200, function()
     local line = f:read("l")
     f:close()
     os.remove(CMD)
+    if line then line = line:gsub("\r+$", "") end
     if line and line ~= "" then
         busy = true
         dispatch(line)
     end
     return false
+end)
+
+-- Ctrl+F9 in game: same as the DUMP command, result goes to UE4SS.log.
+RegisterKeyBind(Key.F9, { ModifierKey.CONTROL }, function()
+    ExecuteInGameThread(function()
+        local ok, res, text = pcall(handlers.DUMP)
+        print("[StolenHours] Ctrl+F9 dump: " .. tostring(ok and text or res) .. "\n")
+    end)
 end)
 
 print("[StolenHours] live controller " .. VERSION .. " polling " .. LIVE_DIR .. "\n")

@@ -17,6 +17,7 @@ ITEM_LIST_FILE = COMMUNITY_EDITOR / "itemlist.txt"
 SAVE_FILE_NAME = "002DAE74-00-gamedata.bin"
 GAME_PROCESS_NAMES = ("NFL1-Win64-Shipping.exe", "NFL1.exe", "EACLauncher.exe", "GameBootstrapper.exe")
 LIVE_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours" / "live"
+DUMPS_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours" / "dumps"
 
 
 class NotFound(RuntimeError):
