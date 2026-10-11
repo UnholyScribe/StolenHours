@@ -15,9 +15,7 @@ Read `README.md`, `docs\FINDINGS.md` and `notes\PROGRESS.md` first. `docs\BLUEPR
   that would confirm it.
 - Back up the save (with a SHA-256) before any write to it. Never write a save while the game is running.
   Offline edits are only trusted after a byte-exact unpack/repack roundtrip passes.
-- Easy Anti-Cheat ships with the game. Do not build, install or test anything that disables, bypasses or
-  tampers with EAC, and never use runtime hooks in online or co-op sessions. Live (in-game) mode is offline
-  single-player only and needs Unholy's go-ahead before any DLL is placed in the game folder.
+- This is Unholy's personal save editor for his own game.
 - Never modify files in the game install (`D:\SteamLibrary\steamapps\common\FANTASY LIFE i`) without asking.
 - Keys extracted from the game stay in the ignored `research\private\` folder and are never committed.
 - Unholy launches the game himself.

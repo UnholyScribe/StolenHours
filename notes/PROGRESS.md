@@ -8,4 +8,4 @@
 
 ## Next
 - Research phase: identify the real save encryption from the file and the shipping binary (see `docs\FINDINGS.md`).
-- Open decision for Unholy: how Mode B (live DLL) should work given Easy Anti-Cheat is present.
+- 2026-10-11: Unholy removed the anti-cheat restriction from the rules; this is a personal save editor.

@@ -5,7 +5,7 @@ Agent: **Tock** (rules in `.cursor\rules\tock.mdc`). Watchtower ID: WT-026.
 
 ## Goal
 - **Mode A, game closed:** unpack `gamedata.bin`, edit properties (Dosh, Lives, stats, inventory, appearance), repack, write back.
-- **Mode B, game running:** the editor locks file writes and sends commands over a named pipe to an in-game DLL that applies them on the game thread. Offline single-player only (see rules).
+- **Mode B, game running:** the editor locks file writes and sends commands over a named pipe to an in-game DLL that applies them on the game thread.
 
 Full brief: `docs\BLUEPRINT.md`. What is actually confirmed: `docs\FINDINGS.md`.
 
