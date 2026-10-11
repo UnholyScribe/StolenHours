@@ -21,6 +21,12 @@
   `backups\game_install\2026-10-11_194144\` (SHA-256 `DD2A5155...7204D1`). Undo: `hook\install_live.ps1 -Uninstall`.
   A Steam update or "verify files" will undo the ini change.
 
+## 2026-10-11: Portable path discovery (Tock)
+- `editor\stolenhours\steam.py`: Steam root from registry (drive scan only as fallback), libraries from
+  `libraryfolders.vdf`, game from `appmanifest_2993780.acf` / shipping exe, saves per account with
+  `loginusers.vdf` to pick the default. Env overrides. `where` command; GUI save dropdown; install script auto-detects.
+- 9 new tests on fake Steam layouts (other drive, renamed folder, old VDF format, no registry, no Steam). 28 total pass.
+
 ## Next
 - Unholy: first real edit (e.g. `set-money`), launch, confirm Dosh in game. Then try `add-item`.
 - Unholy: compare the Life menu with `StolenHours.cmd lives` to confirm life id names.

@@ -5,12 +5,19 @@
 # Every file it changes is first copied to backups\game_install\<timestamp>\ with SHA-256.
 # Run only with the game closed. Undo: install_live.ps1 -Uninstall
 param(
-    [string]$GameDir = "D:\SteamLibrary\steamapps\common\FANTASY LIFE i",
+    [string]$GameDir = "",
     [switch]$Uninstall,
     [switch]$KeepEAC
 )
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
+if (-not $GameDir) {
+    Push-Location (Join-Path $Root "editor")
+    try { $GameDir = (& py -3.12 -m stolenhours where --game-dir 2>&1 | Select-Object -Last 1).ToString().Trim() }
+    finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw "Could not detect the game folder ($GameDir). Pass -GameDir." }
+    "Detected game folder: $GameDir"
+}
 $Win64 = Join-Path $GameDir "Game\Binaries\Win64"
 $Ini = Join-Path $GameDir "GameBootstrapper.ini"
 $Dist = Join-Path $Root "tools\ue4ss\dist"

@@ -8,17 +8,17 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from . import live, safety, savefile
+from . import live, paths, safety, savefile
 
 POLL_MS = 2000
 
 
 class App(tk.Tk):
-    def __init__(self, save_path: Path):
+    def __init__(self, save_path: Path | None):
         super().__init__()
         self.title("Stolen Hours - Fantasy Life i")
         self.geometry("980x640")
-        self.save_path = Path(save_path)
+        self.save_path = save_path
         self.sf: savefile.SaveFile | None = None
         self.item_names = savefile.load_item_names()
         self.bridge = live.LiveBridge()
@@ -26,9 +26,10 @@ class App(tk.Tk):
 
         top = ttk.Frame(self, padding=6)
         top.pack(fill="x")
-        self.path_var = tk.StringVar(value=str(self.save_path))
+        self.path_var = tk.StringVar(value=str(save_path) if save_path else "")
         ttk.Label(top, text="Save:").pack(side="left")
-        ttk.Entry(top, textvariable=self.path_var, width=80).pack(side="left", padx=4)
+        ttk.Combobox(top, textvariable=self.path_var, width=80,
+                     values=[str(p) for p in paths.candidate_save_paths()]).pack(side="left", padx=4)
         ttk.Button(top, text="Browse", command=self.browse).pack(side="left")
         ttk.Button(top, text="Load", command=self.load).pack(side="left", padx=4)
         self.save_btn = ttk.Button(top, text="Save to file", command=self.save, state="disabled")
@@ -157,6 +158,9 @@ class App(tk.Tk):
             self.path_var.set(p)
 
     def load(self):
+        if not self.path_var.get().strip():
+            self.status.set("no save found automatically; use Browse")
+            return
         self.status.set("loading (decrypt, parse, byte-exact checks)...")
         self.save_btn.config(state="disabled")
         path = Path(self.path_var.get())
@@ -298,5 +302,5 @@ class App(tk.Tk):
         self.update_save_button()
 
 
-def main(save_path: Path):
+def main(save_path: Path | None):
     App(save_path).mainloop()

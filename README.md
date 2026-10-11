@@ -34,7 +34,19 @@ Tests: `cd editor; py -3.12 -m pytest -q tests`
 installs UE4SS and the `StolenHours` Lua mod. `-Uninstall` reverts it. Then in game: `live ping`, `live find Money`,
 `live set <object path> Money 500000`.
 
-## Real locations (checked 2026-10-11)
+## Finding Steam, the game and the save on any PC
+Nothing is hardcoded. `StolenHours.cmd where` shows what was detected:
+- Steam: registry (`HKCU\Software\Valve\Steam\SteamPath`, then HKLM `InstallPath`). Only if that fails, common
+  folders on every drive (`Program Files (x86)\Steam`, `X:\Steam`, `X:\Games\Steam`).
+- Game: every library in `steamapps\libraryfolders.vdf` (new and old format), `installdir` from
+  `appmanifest_2993780.acf`, else any `steamapps\common\*` folder holding `Game\Binaries\Win64\NFL1-Win64-Shipping.exe`,
+  else `X:\SteamLibrary` style folders on every drive. Renamed folders and other drives are fine.
+- Save: `userdata\<account>\2993780\remote\*gamedata.bin` for every account. Default is the most recent
+  Steam login (`config\loginusers.vdf`), then the newest file. Direct-launch saves
+  (`%LOCALAPPDATA%\Game\Saved\SaveGames`) are listed after Steam ones. The GUI dropdown lists all of them.
+- Overrides: `STOLENHOURS_STEAM_DIR`, `STOLENHOURS_GAME_DIR`, `STOLENHOURS_SAVE`, or `--save` / `-GameDir`.
+
+## Locations on Unholy's PC (checked 2026-10-11)
 | What | Path |
 |---|---|
 | Save folder | `C:\Null\Grave\userdata\235938730\2993780\remote\` (Steam is installed at `C:\Null\Grave`) |

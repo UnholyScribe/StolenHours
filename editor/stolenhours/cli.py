@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
-from . import container, live, paths, safety, savefile
+from . import container, live, paths, safety, savefile, steam
 
 
 def _save_path(args) -> Path:
@@ -168,14 +169,38 @@ def cmd_live(args):
     print(("OK  " if r.ok else "ERR ") + r.text.replace(" | ", "\n    "))
 
 
+def cmd_where(args):
+    if args.game_dir:
+        print(paths.game_dir())
+        return
+    roots = steam.find_steam_roots()
+    print("steam      " + (", ".join(map(str, roots)) or "not found"))
+    games = steam.find_game_dirs()
+    print("game       " + (", ".join(map(str, games)) or "not found"))
+    saves = steam.find_saves()
+    if not saves:
+        print("saves      none found")
+    for i, s in enumerate(saves):
+        who = f"account {s.account_id}" + (f" ({s.persona})" if s.persona else "") if s.account_id else s.kind
+        tag = "  <- default" if i == 0 and not os.environ.get(steam.ENV_SAVE) else ""
+        print(f"save       {s.path}  [{who}{', most recent login' if s.most_recent_user else ''}]{tag}")
+    for env in (steam.ENV_STEAM, steam.ENV_GAME, steam.ENV_SAVE):
+        if os.environ.get(env):
+            print(f"override   {env}={os.environ[env]}")
+
+
 def cmd_gui(args):
     from . import gui
-    gui.main(_save_path(args))
+    try:
+        p = _save_path(args)
+    except paths.NotFound:
+        p = None
+    gui.main(p)
 
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="stolenhours", description="Fantasy Life i save editor (Stolen Hours)")
-    ap.add_argument("--save", help=f"save file (default {paths.default_save_path()})")
+    ap.add_argument("--save", help="save file (default: auto-detected, see `where`)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def edit(name, fn, help_):
@@ -209,6 +234,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("live", help="Mode B: talk to the in-game mod")
     p.add_argument("verb", choices=["status", "ping", "find", "get", "set", "props"]); p.add_argument("args", nargs="*")
     p.set_defaults(fn=cmd_live)
+    p = sub.add_parser("where", help="show the detected Steam, game and save locations")
+    p.add_argument("--game-dir", action="store_true", help="print only the game folder (for scripts)")
+    p.set_defaults(fn=cmd_where)
     sub.add_parser("gui", help="desktop editor").set_defaults(fn=cmd_gui)
     return ap
 
@@ -217,7 +245,8 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
         args.fn(args)
-    except (container.ContainerError, savefile.SaveFileError, safety.SafetyError, live.LiveError) as e:
+    except (container.ContainerError, savefile.SaveFileError, safety.SafetyError, live.LiveError,
+            paths.NotFound) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     return 0
