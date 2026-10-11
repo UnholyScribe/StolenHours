@@ -15,11 +15,14 @@
 - 19 tests pass (`editor\tests`). Fast serializer (bytearray) replaces the community one: load+verify ~4 s instead of ~24 s.
 - Mode B: UE4SS Lua mod (`hook\ue4ss_mod\StolenHours`) + file mailbox client. Blueprint ProcessEvent signature has
   0 hits in the binary, so the hand-written proxy DLL was dropped in favour of UE4SS reflection.
-- UE4SS downloaded to `tools\ue4ss`; NOT installed. `hook\install_live.ps1` ready, waiting on Unholy's OK.
-- Live save not written. Game install not modified.
+- Live save not written.
+- With Unholy's OK, ran `hook\install_live.ps1`: GameBootstrapper.ini now launches `NFL1-Win64-Shipping.exe` (EAC skipped),
+  UE4SS + StolenHours mod installed in `Game\Binaries\Win64`. Original ini backed up to
+  `backups\game_install\2026-10-11_194144\` (SHA-256 `DD2A5155...7204D1`). Undo: `hook\install_live.ps1 -Uninstall`.
+  A Steam update or "verify files" will undo the ini change.
 
 ## Next
 - Unholy: first real edit (e.g. `set-money`), launch, confirm Dosh in game. Then try `add-item`.
 - Unholy: compare the Life menu with `StolenHours.cmd lives` to confirm life id names.
-- After OK: run `hook\install_live.ps1`, launch through Steam, check `ue4ss\UE4SS.log`, then `live ping` and `live find Money`.
+- Unholy: launch through Steam, load the save. Then Tock reads `ue4ss\UE4SS.log` and runs `live ping`, `live find Money`.
 - Map `m_AvatarStatus` (appearance) once the above works.
