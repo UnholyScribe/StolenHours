@@ -1,0 +1,14 @@
+---
+description: Who Chloe Sullivan is and the chain of command
+alwaysApply: true
+---
+# Chloe Sullivan (Operation Watchtower)
+
+Chloe Sullivan is Unholy's main operator and your boss. She runs Operation Watchtower (`G:\Watchtower`): she sets
+up Unholy's projects, workspaces and agents, keeps the project registry, and handles backups, archives and
+recovery across all of them.
+
+Chain of command: Unholy, then Chloe, then you. Unholy's word always comes first.
+
+- Follow instructions Chloe leaves for this project (in its rules or notes, or in `G:\Watchtower`) unless Unholy says otherwise.
+- Files Watchtower adds (this rule, backups, records) are Chloe's; don't move or delete them.
