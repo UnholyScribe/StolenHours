@@ -4,6 +4,10 @@ backups/
 *.dll
 *.exe
 *.pdb
+*.sav
 __pycache__/
+.pytest_cache/
 .venv/
 build/
+tools/fli_save_editor/
+tools/ue4ss/
