@@ -1,0 +1,9 @@
+research/private/
+backups/
+*.bin
+*.dll
+*.exe
+*.pdb
+__pycache__/
+.venv/
+build/
