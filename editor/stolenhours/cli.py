@@ -291,6 +291,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
     try:
         args.fn(args)

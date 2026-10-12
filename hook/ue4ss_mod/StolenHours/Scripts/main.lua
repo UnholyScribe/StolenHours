@@ -7,7 +7,7 @@ local LIVE_DIR = (os.getenv("LOCALAPPDATA") or ".") .. "\\StolenHours\\live\\"
 local CMD = LIVE_DIR .. "cmd.txt"
 local ACK = LIVE_DIR .. "ack.txt"
 local HEARTBEAT = LIVE_DIR .. "heartbeat.txt"
-local VERSION = "0.2.0"
+local VERSION = "0.3.0"
 local busy = false
 local Dump = require("stolenhours_dump")
 
@@ -109,14 +109,56 @@ handlers.FIND_PROP = function(args)
     return true, table.concat(lines, " | ")
 end
 
--- GET <target> <Property>
+-- Property paths: "Money", "m_permanent.Money", "m_permanent.m_stAvatarP[0].m_name" (array indexes are 0-based)
+local function parse_path(path)
+    local segs = {}
+    for seg in tostring(path):gmatch("[^%.]+") do
+        local name, idx = seg:match("^([^%[]+)%[(%d+)%]$")
+        if name then
+            segs[#segs + 1] = { key = name }
+            segs[#segs + 1] = { index = tonumber(idx) + 1 }
+        else
+            segs[#segs + 1] = { key = seg }
+        end
+    end
+    return segs
+end
+
+local function step(container, seg)
+    if seg.index then
+        if container.GetArrayNum and seg.index > container:GetArrayNum() then error("index out of range") end
+        local v = container[seg.index]
+        if type(v) == "table" and v.get then v = v:get() end
+        return v
+    end
+    return container[seg.key]
+end
+
+-- Returns the container holding the last segment, and that segment.
+local function walk(obj, path)
+    local segs = parse_path(path)
+    if #segs == 0 then error("empty property path") end
+    local cur = obj
+    for i = 1, #segs - 1 do
+        cur = step(cur, segs[i])
+        if cur == nil then error("path breaks at segment " .. i) end
+    end
+    return cur, segs[#segs]
+end
+
+local function read_path(obj, path)
+    local c, last = walk(obj, path)
+    return step(c, last)
+end
+
+-- GET <target> <path>
 handlers.GET = function(args)
     local obj = resolve(args[1] or "")
     if not obj then return false, "object not found: " .. tostring(args[1]) end
-    return true, to_text(obj:GetPropertyValue(args[2]))
+    return true, to_text(read_path(obj, args[2] or ""))
 end
 
--- SET <target> <Property> <number|true|false>
+-- SET <target> <path> <number|true|false> : writes, then re-reads through a fresh walk to prove it stuck
 handlers.SET = function(args)
     local obj = resolve(args[1] or "")
     if not obj then return false, "object not found: " .. tostring(args[1]) end
@@ -124,8 +166,15 @@ handlers.SET = function(args)
     local value
     if raw == "true" then value = true elseif raw == "false" then value = false else value = tonumber(raw) end
     if value == nil then return false, "only numeric/bool values are supported" end
-    obj:SetPropertyValue(args[2], value)
-    return true, to_text(obj:GetPropertyValue(args[2]))
+    local c, last = walk(obj, args[2] or "")
+    if last.index then return false, "cannot assign a whole array element" end
+    local before = to_text(c[last.key])
+    c[last.key] = value
+    local after = to_text(read_path(obj, args[2]))
+    if after ~= to_text(value) then
+        return false, "write did not stick: before " .. before .. ", wrote " .. tostring(value) .. ", now " .. after
+    end
+    return true, before .. " -> " .. after
 end
 
 -- LIST_PROPS <target> : property names and current values of one object

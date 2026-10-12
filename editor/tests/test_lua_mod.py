@@ -31,6 +31,14 @@ local gi = MOCK.object("DP1GameInstance /Engine/Transient.DP1GameInstance_0", gi
 })
 gi._values.Owner = gi
 MOCK.object("DP1GameInstance /Script/DP1Project.Default__DP1GameInstance", giClass, { Money = 0 })
+local playStruct = MOCK.class("ScriptStruct /Script/DP1Project.PLAY_DATA_P", { P("Money", "IntProperty", 0x40) })
+local gddPlay = MOCK.class("Class /Script/DP1Project.GDDPlayData",
+    { P("m_permanent", "StructProperty", 0x30, { struct = playStruct }) })
+MOCK.object("GDDPlayData /Engine/Transient.GDDPlayData_1", gddPlay,
+    { m_permanent = MOCK.structval({ Money = 14633 }) })
+local umgWidget = MOCK.class("Class /Script/UMG.Widget", { P("Visibility", "IntProperty", 0) })
+local numPrim = MOCK.class("Class /Script/DP1Project.NumPrimitive", { P("m_basePanel", "ObjectProperty", 0x418) }, umgWidget)
+MOCK.object("NumPrimitive /Engine/Transient.Menu.WidgetTree_1.NumPrimitive_Stock", numPrim, {})
 local engineOnly = MOCK.class("Class /Script/Engine.Actor", { P("Secret", "IntProperty", 0) })
 MOCK.object("Actor /Game/Maps/Island.Island:PersistentLevel.Actor_1", engineOnly, { Secret = 999 })
 MOCK.game_instance = gi
@@ -62,7 +70,7 @@ def mod(tmp_path):
 
 def test_ping_and_unknown(mod):
     _, send, *_ = mod
-    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.2.0"]
+    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.3.0"]
     assert send("a2\tNOPE")[1] == "ERR"
 
 
@@ -79,11 +87,36 @@ def test_find_get_set(mod):
     assert r[1] == "OK" and "DP1GameInstance_0 = 14633" in r[2] and "Default__" not in r[2]
     path = "DP1GameInstance /Engine/Transient.DP1GameInstance_0"
     assert send(f"b2\tGET\t{path}\tMoney")[2] == "14633"
-    assert send(f"b3\tSET\t{path}\tMoney\t500000")[2] == "500000"
+    assert send(f"b3\tSET\t{path}\tMoney\t500000")[2] == "14633 -> 500000"
     assert send("b4\tGET\tDP1GameInstance\tMoney")[2] == "500000"
     assert send(f"b5\tSET\t{path}\tMoney\tabc")[1] == "ERR"
     r = send("b6\tFIND_PROP\tLv")
     assert r[1] == "OK" and "struct ScriptStruct /Script/DP1Project.FLifeStatus" in r[2]
+
+
+def test_nested_paths(mod):
+    _, send, *_ = mod
+    assert send("p1\tGET\tGDDPlayData\tm_permanent.Money")[2] == "14633"
+    assert send("p2\tSET\tGDDPlayData\tm_permanent.Money\t99999")[2] == "14633 -> 99999"
+    assert send("p3\tGET\tGDDPlayData\tm_permanent.Money")[2] == "99999"
+    assert send("p4\tGET\tDP1GameInstance\tLevels[0]")[2] == "11"
+    assert send("p5\tGET\tDP1GameInstance\tStatus.Exp")[2] == "221"
+    assert send("p6\tGET\tDP1GameInstance\tLevels[9]")[1] == "ERR"
+    assert send("p7\tGET\tGDDPlayData\tnope.Money")[1] == "ERR"
+
+
+def test_set_reports_write_that_did_not_stick(mod):
+    rt, send, *_ = mod
+    # a struct accessor that hands out copies: the write is lost and SET must say so
+    rt.execute('''
+        local o = FindFirstOf("GDDPlayData")
+        local store = { Money = 5 }
+        o._values.m_permanent = nil
+        setmetatable(o._values, { __index = function(_, k)
+            if k == "m_permanent" then return { Money = store.Money } end end })
+    ''')
+    r = send("q1\tSET\tGDDPlayData\tm_permanent.Money\t7")
+    assert r[1] == "ERR" and "did not stick" in r[2]
 
 
 def test_dump_values_and_schema(mod):
@@ -101,13 +134,16 @@ def test_dump_values_and_schema(mod):
     assert "Levels = [3][11, 1, 0]" in values
     assert "Owner = DP1GameInstance /Engine/Transient.DP1GameInstance_0" in values
     assert "Default__" not in values and "Secret" not in values
+    assert "NumPrimitive" not in values and "skipped UI/anim 1" in values
+    assert values.index("GDDPlayData_1") < values.rindex("=== DP1GameInstance /Engine/Transient.DP1GameInstance_0")
+    assert "m_permanent = {Money=14633}" in values
     assert "=== Class /Script/DP1Project.DP1GameInstance : Class /Script/Engine.GameInstance" in schema
     assert "0x0330 StructProperty Status (ScriptStruct /Script/DP1Project.FLifeStatus)" in schema
     assert "Miner = 5" in schema
 
     targets = {"Money": 14633, "character name": "N30Killer"}
     rep = dumpscan.analyze(next(dumps.glob("values_*.txt")), targets)
-    assert {p.name for p in rep.hits["Money"]} == {"Money"}
+    assert {p.name for p in rep.hits["Money"]} == {"Money", "m_permanent"}
     assert {p.name for p in rep.hits["character name"]} == {"PlayerName"}
 
 

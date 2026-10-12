@@ -19,6 +19,32 @@ local function is_game_path(path)
     return false
 end
 
+-- UI widgets and animation objects are skipped entirely: a widget (NumPrimitive.m_basePanel) held a garbage
+-- object pointer and reading it crashed the game (2026-10-11). pcall cannot catch native access violations.
+local UNSAFE_SUPERS = {
+    "/Script/UMG.", "/Script/SlateCore.", "/Script/Slate.",
+    "/Script/Engine.AnimInstance", "/Script/Engine.AnimNotify", "/Script/Engine.AnimNotifyState",
+}
+
+local unsafe_cache = {}
+local function class_is_unsafe(cls)
+    local key = cls:GetFullName()
+    if unsafe_cache[key] ~= nil then return unsafe_cache[key] end
+    local bad = false
+    local c = cls
+    while c and c:IsValid() do
+        local p = c:GetFullName()
+        for _, m in ipairs(UNSAFE_SUPERS) do
+            if p:find(m, 1, true) then bad = true break end
+        end
+        if bad then break end
+        c = c:GetSuperStruct()
+    end
+    unsafe_cache[key] = bad
+    return bad
+end
+M.class_is_unsafe = class_is_unsafe
+
 local function clean(s)
     return (tostring(s):gsub("[\r\n\t]", " "))
 end
@@ -155,19 +181,34 @@ function M.values(stamp)
         end
     end
 
-    ForEachUObject(function(obj)
-        local ok = pcall(function()
-            local cls = obj:GetClass()
-            if not cls or not cls:IsValid() then return end
-            if not is_game_path(cls:GetFullName()) then return end
-            local full = obj:GetFullName()
-            if full:find("Default__", 1, true) or full:find("REINST_", 1, true) then return end
-            dump_object(w, obj, full, false)
-            count = count + 1
+    -- Pass 1: the GDD* game-data objects (the live copy of the save), flushed right away.
+    -- Pass 2: other game-code objects, minus UI and animation.
+    local skipped = 0
+    for pass = 1, 2 do
+        w:line("# pass " .. pass .. (pass == 1 and " game data (GDD*)" or " other game objects"))
+        ForEachUObject(function(obj)
+            local ok = pcall(function()
+                local cls = obj:GetClass()
+                if not cls or not cls:IsValid() then return end
+                local cpath = cls:GetFullName()
+                if not is_game_path(cpath) then return end
+                local is_gdd = cpath:find("/Script/DP1Project.GDD", 1, true) ~= nil
+                if (pass == 1) ~= is_gdd then return end
+                local full = obj:GetFullName()
+                if full:find("Default__", 1, true) or full:find("REINST_", 1, true) then return end
+                if not is_gdd and (full:find("WidgetTree", 1, true) or class_is_unsafe(cls)) then
+                    skipped = skipped + 1
+                    return
+                end
+                dump_object(w, obj, full, false)
+                count = count + 1
+                if is_gdd then w:flush() end
+            end)
+            if not ok then errors = errors + 1 end
         end)
-        if not ok then errors = errors + 1 end
-    end)
-    w:line("# objects " .. count .. ", errors " .. errors)
+        w:flush()
+    end
+    w:line("# objects " .. count .. ", errors " .. errors .. ", skipped UI/anim " .. skipped)
     w:close()
     return true, path .. " (" .. count .. " objects, " .. errors .. " errors)"
 end

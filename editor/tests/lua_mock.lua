@@ -58,10 +58,11 @@ MOCK.StructClass = { IsValid = function() return true end, GetFullName = functio
 function MOCK.structval(values) return values end
 
 function MOCK.array(items)
-    return {
+    local a = {
         GetArrayNum = function() return #items end,
         ForEach = function(self, cb) for i, v in ipairs(items) do cb(i, { get = function() return v end }) end end,
     }
+    return setmetatable(a, { __index = function(_, k) if type(k) == "number" then return items[k] end end })
 end
 
 function MOCK.object(full, cls, values)

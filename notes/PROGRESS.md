@@ -39,8 +39,17 @@
 - Mod 0.2.0 copied into the game; UE4SS hot reload enabled (Ctrl+R). Needs one game restart to take effect.
 - Stale-save guard: writes refuse if the save changed on disk since it was loaded. Appearance editing added.
 
+## 2026-10-11: Live Dosh found, crash-safe dump (Tock)
+- First full dump found the live data: `GDDPlayData.m_permanent.Money` etc. (see FINDINGS). The dump then crashed
+  the game on a menu widget; the save was checked (verify OK, sha A2E38F58...) and backed up (`after-crash`).
+- Mod 0.3.0: dump skips UI/animation objects and writes `GDD*` first; `GET`/`SET` take paths
+  (`m_permanent.Money`, `m_stAvatarP[0].m_name`); `SET` re-reads and returns ERR if the write did not stick.
+  Deployed to the game. 39 tests pass.
+
 ## Next
-- Unholy: restart the game once, load the save. Tock: `live dump`, read the report, find the live owner of Money.
+- Unholy: launch the game, load the save. Tock: `live dump` (crash-safe now), then the reversible test
+  `live get GDDPlayData m_permanent.Money` / set +1 / restore, and check Dosh on screen.
+- Map properties (life levels/exp) in the dump and GET.
 - Unholy: first real edit (e.g. `set-money`), launch, confirm Dosh in game. Then try `add-item`.
 - Unholy: compare the Life menu with `StolenHours.cmd lives` to confirm life id names.
 - Unholy: launch through Steam, load the save. Then Tock reads `ue4ss\UE4SS.log` and runs `live ping`, `live find Money`.
