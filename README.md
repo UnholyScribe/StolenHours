@@ -22,12 +22,12 @@ through Steam.
 | Bag | Item amounts, add new items to any pocket |
 | Look | Your appearance, with a 3D preview |
 | Map | Which map events show up, time and weather |
-| Live Map | Map events and where you are while the game runs |
+| Live Map | Every map with towers, towns, shrines, shops, campfires, gathering spots and monsters; live map events and where you are while the game runs |
 | Time Hook | Change the running game (Dosh) |
 | Records | Your play records |
 | Backups | Automatic backups, one-click restore |
 
-Live Map and Time Hook need [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) in the game. The editor installs its own
+The Live Map's places work on their own; its live events, your position and the Time Hook need [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) in the game. The editor installs its own
 small mod for you (from either tab) once UE4SS is there. Everything else works on the save file alone.
 
 | | |
@@ -48,5 +48,6 @@ Still, keep your own copy of your save. Use it offline and at your own risk; don
 
 ## Credits
 
+- Built by Unholy with his friend Tock, his AI coding partner.
 - Item, flag and skill lists from Niedzielan's fli_save_editor.
 - Fantasy Life i is © LEVEL-5. This is a fan-made tool, not affiliated with or endorsed by LEVEL-5.
