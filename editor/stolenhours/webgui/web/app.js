@@ -553,7 +553,8 @@ function drawInventory() {
         <div><label class="field-label">Quantity</label><input type="number" id="add-n" min="1" max="65535" value="1"></div>
         <button class="btn btn-green shrink" id="add-go" style="margin-top:28px">Add</button>
       </div>
-      <div class="note">New items copy the last item in the pocket (same as the community editor). Whether every item works when added is not confirmed in game yet.</div>
+      <div class="note">Gear added here comes out plain, at the lowest grade it's made in. To pick its grade, quality and
+        skills, use Vulcan. Whether every item works when added is not confirmed in game yet.</div>
     </div></div>
   </div>`;
   $$("[data-cat]").forEach((t) => (t.onclick = async () => { S.cat = t.dataset.cat; S.item = null; S.addPick = null; S.results = []; await loadItems(); drawInventory(); }));
