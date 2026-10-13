@@ -199,7 +199,7 @@ class App(tk.Tk):
         self.ov["name"].set(sf.character_name)
         self.ov["island"].set(sf.island_name)
         self.ov["money"].set(str(sf.money))
-        self.ov["life"].set(f"{sf.current_life} ({savefile.LIFE_NAMES_UNVERIFIED.get(sf.current_life, '?')})")
+        self.ov["life"].set(f"{sf.current_life} ({savefile.LIFE_NAMES.get(sf.current_life, '?')})")
         self.ov["playtime"].set(f"{h}h {m:02d}m")
         self.lives_tv.delete(*self.lives_tv.get_children())
         for l in sf.lives():

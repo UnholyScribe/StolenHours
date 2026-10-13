@@ -23,6 +23,19 @@ def test_known_values(loaded):
     assert len(loaded.lives()) == 15
 
 
+def test_worn_items_are_armour_of_the_current_life(loaded):
+    worn = loaded.worn_items()
+    assert worn and all(i.startswith(("iam", "iwp", "itl")) for i in worn.values())
+    assert set(worn) <= {"weapon", "shield", "Head", "tops", "bottoms", "arm", "foot", "mantle", "glasses", "Accessory"}
+
+
+def test_skill_panels_match_miner_board(loaded):
+    sp = loaded.skill_panels()
+    assert all(401 <= f <= 473 for f in sp["learned"])
+    assert len(sp["learned"]) == 11
+    assert set(sp["unlocked"]) <= set(range(401, 474))
+
+
 def test_unedited_pack_is_original(loaded):
     assert loaded.to_bin() == loaded.raw
 
@@ -85,6 +98,49 @@ def test_unicode_name(loaded):
     sf.character_name = "Tøck"
     d = savefile.parse_gvas(container.unpack(sf.to_bin(), sf.key).gvas)
     assert d["saveData"]["m_CharaStatus"]["m_stAvatarP"][0]["m_name"]["content"] == "Tøck"
+
+
+def _only_play_data_changed(loaded, sf, fields):
+    d = savefile.parse_gvas(container.unpack(sf.to_bin(), sf.key).gvas)
+    before, after = loaded.data, d
+    assert after["header"] == before["header"]
+    for k in before["saveData"]:
+        if k != "m_PlayData":
+            assert after["saveData"][k] == before["saveData"][k], k
+    changed = {k for k, v in before["saveData"]["m_PlayData"].items() if after["saveData"]["m_PlayData"][k] != v}
+    assert changed == set(fields)
+    return after["saveData"]["m_PlayData"]
+
+
+def test_island_rename_touches_only_the_name(loaded):
+    sf = fresh(loaded)
+    sf.island_name = "Stormhaven"
+    assert _only_play_data_changed(loaded, sf, {"islandName"})["islandName"] == "Stormhaven"
+
+
+def test_island_rename_unicode_and_limits(loaded):
+    sf = fresh(loaded)
+    sf.island_name = "Île Tøck"
+    assert _only_play_data_changed(loaded, sf, {"islandName"})["islandName"]["content"] == "Île Tøck"
+    for bad in ("", "   ", " Lead", "Trail ", "x" * (savefile.ISLAND_NAME_MAX + 1), "bad\nname"):
+        with pytest.raises(savefile.SaveFileError):
+            sf.island_name = bad
+
+
+def test_play_time_touches_only_play_time(loaded):
+    sf = fresh(loaded)
+    sf.play_time_seconds = 100 * 3600
+    assert _only_play_data_changed(loaded, sf, {"playTime"})["playTime"] == 360000
+
+
+def test_play_time_bounded_by_real_time_since_start(loaded):
+    sf = fresh(loaded)
+    pd = sf.sd["m_PlayData"]
+    assert sf.play_time_max == (pd["saveDateTime"] - pd["startDateTime"]) // 10_000_000
+    sf.play_time_seconds = sf.play_time_max
+    for bad in (-1, sf.play_time_max + 1):
+        with pytest.raises(savefile.SaveFileError):
+            sf.play_time_seconds = bad
 
 
 def test_write_makes_backup(loaded, tmp_path, monkeypatch):

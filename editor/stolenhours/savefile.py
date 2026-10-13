@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import hashlib
 import io
 import struct
 import sys
@@ -22,18 +23,23 @@ if str(paths.COMMUNITY_EDITOR) not in sys.path:
 from fli_sav2json import SaveData as _PatternParser  # noqa: E402
 
 S32_MAX = 2**31 - 1
+U32_MAX = 2**32 - 1
 U16_MAX = 0xFFFF
 # Display limits seen in game UI are UNVERIFIED; these are the field type limits.
 MONEY_MAX = S32_MAX
+ISLAND_NAME_MAX = 16  # conservative until the in-game limit is checked
 STACK_MAX = U16_MAX
 LEVEL_MAX = U16_MAX
+ITEM_TITLE_MAX = 5  # EItemTitleType Legend
+ITEM_QUALITY_MAX = 3  # EItemQualityType Quality_3
+EQUIP_STATUS_MAX = 9  # EEquipStatusType_MAX
 
-# life0001-0013 follow the EMapIconType Master* order in the pattern file; life0000 and life0014 are guesses.
-LIFE_NAMES_UNVERIFIED = {
-    "life0000": "(base / overall?)", "life0001": "Paladin", "life0002": "Mercenary", "life0003": "Hunter",
+# From GDSLifeData (ELifeType and starter tool per id); "Brand New" is the in-game name of the NoMakeup life.
+LIFE_NAMES = {
+    "life0000": "Brand New", "life0001": "Paladin", "life0002": "Mercenary", "life0003": "Hunter",
     "life0004": "Magician", "life0005": "Miner", "life0006": "Woodcutter", "life0007": "Angler",
     "life0008": "Farmer", "life0009": "Cook", "life0010": "Blacksmith", "life0011": "Carpenter",
-    "life0012": "Tailor", "life0013": "Alchemist", "life0014": "Artist?",
+    "life0012": "Tailor", "life0013": "Alchemist", "life0014": "Artist",
 }
 
 EMPTY_IDS = ("", "None", None)
@@ -178,8 +184,8 @@ class SaveFile:
     @classmethod
     def load(cls, path: Path | str, key: bytes | None = None) -> "SaveFile":
         path = Path(path)
-        key = key or container.load_key()
         raw = path.read_bytes()
+        key = key or container.resolve_key(raw)
         gvas = container.unpack(raw, key).gvas
         if container.pack(gvas, key) != raw:
             raise SaveFileError("container repack is not byte-exact; refusing to edit this file")
@@ -214,6 +220,18 @@ class SaveFile:
         v = self.sd["m_PlayData"]["islandName"]
         return v["content"] if isinstance(v, dict) else (v or "")
 
+    @island_name.setter
+    def island_name(self, name: str) -> None:
+        # islandName is the only copy in the save and nothing records a rename (the game has its own rename option);
+        # the in-game length limit is UNVERIFIED (check: the in-game island rename keyboard)
+        name = str(name)
+        if not name.strip() or name != name.strip() or len(name) > ISLAND_NAME_MAX:
+            raise SaveFileError(f"island name must be 1-{ISLAND_NAME_MAX} characters, no leading or trailing spaces")
+        if any(ord(c) < 32 for c in name):
+            raise SaveFileError("island name can't contain control characters")
+        self.sd["m_PlayData"]["islandName"] = name if name.isascii() else {"content": name, "type": "utf-16-le"}
+        self.dirty = True
+
     @property
     def money(self) -> int:
         return self.sd["m_PlayData"]["Money"]
@@ -231,6 +249,23 @@ class SaveFile:
         return self.sd["m_PlayData"]["playTime"]
 
     @property
+    def play_time_max(self) -> int:
+        """Time played can't exceed the real time between starting the adventure and the last save."""
+        pd = self.sd["m_PlayData"]
+        return max(0, min(U32_MAX, (pd["saveDateTime"] - pd["startDateTime"]) // 10_000_000))
+
+    @play_time_seconds.setter
+    def play_time_seconds(self, value: int) -> None:
+        # playTime (u32 seconds) is the only play-time counter in the save; the in-game clock (envInfo.gameTime)
+        # is story-driven world time, not time played, and Steam's own hours live on Steam's servers
+        value = int(value)
+        if not 0 <= value <= self.play_time_max:
+            raise SaveFileError(f"play time must be 0..{self.play_time_max // 3600}h (the real time since the "
+                                "adventure started)")
+        self.sd["m_PlayData"]["playTime"] = value
+        self.dirty = True
+
+    @property
     def current_life(self) -> str:
         return self.avatar["m_lifeId"]
 
@@ -241,10 +276,57 @@ class SaveFile:
         out = []
         for e in a["m_lifeStatus"]:
             k = e["key"]
-            out.append({"id": k, "name": LIFE_NAMES_UNVERIFIED.get(k, k), "level": lv.get(k), "exp": exp.get(k),
+            out.append({"id": k, "name": LIFE_NAMES.get(k, k), "level": lv.get(k), "exp": exp.get(k),
                         "rank": e["value"]["licenseRank"], "star": e["value"]["star"],
                         "skillMaxPoint": e["value"]["skillMaxPoint"]})
         return out
+
+    def equipped(self, handle: int) -> str | None:
+        """Equipment handle -> item id. Layout (from Unholy's save, every equipped slot resolves to the matching
+        item): (slot + 1) << 18 | pocket << 12 | slot, pocket = index in inventory_categories()."""
+        if not handle:
+            return None
+        slot, pocket = handle & 0xFFF, (handle >> 12) & 0x3F
+        cats = self.inventory_categories()
+        if pocket >= len(cats) or (handle >> 18) != slot + 1:
+            return None
+        items = self.items(cats[pocket])
+        return items[slot].item_id if slot < len(items) else None
+
+    def held_items(self) -> dict[str, list[str]]:
+        """Per life: weapon/tool and shield item ids; the appearance (view) set wins over the real gear."""
+        a = self.avatar
+        gear = {e["key"]: e["value"] for e in a["m_abilityEquipInvInfo"]}
+        view = {e["key"]: e["value"] for e in a.get("m_viewEquipInvInfo") or []}
+        out = {}
+        for life, slots in gear.items():
+            ids = []
+            for slot in ("weapon", "shield"):
+                h = (view.get(life, {}).get(slot) or {}).get("handle") or (slots.get(slot) or {}).get("handle")
+                if (item := self.equipped(h)) is not None:
+                    ids.append(item)
+            out[life] = ids
+        return out
+
+    def worn_items(self, life: str | None = None) -> dict[str, str]:
+        """Equipment slot (Head, tops, bottoms, arm, foot, mantle, glasses, ...) -> item id the life shows, the
+        appearance (view) set winning over the real gear. Defaults to the current life."""
+        a = self.avatar
+        life = life or self.current_life
+        gear = next((e["value"] for e in a["m_abilityEquipInvInfo"] if e["key"] == life), {})
+        view = next((e["value"] for e in a.get("m_viewEquipInvInfo") or [] if e["key"] == life), {})
+        out = {}
+        for slot in dict.fromkeys([*gear, *view]):
+            h = (view.get(slot) or {}).get("handle") or (gear.get(slot) or {}).get("handle")
+            if (item := self.equipped(h)) is not None:
+                out[slot] = item
+        return out
+
+    def skill_panels(self) -> dict[str, list[int]]:
+        """Skill board flag numbers (GDSSkillBoard `flagNo`) that are learned / unlocked."""
+        fs = self.sd["m_FlagStatus"]
+        return {"learned": [i for i, v in enumerate(fs["skillPanelBitFlag"]) if v],
+                "unlocked": [i for i, v in enumerate(fs["skillPanelUnlockBitFlag"]) if v]}
 
     def set_life(self, life_id: str, level: int | None = None, exp: int | None = None, rank: int | None = None) -> None:
         a = self.avatar
@@ -277,10 +359,9 @@ class SaveFile:
     def appearance(self) -> dict:
         return dict(self._body)
 
-    def set_appearance(self, field: str, value) -> None:
-        """Name fields must keep the current ID's shape (same length, same prefix up to the last 2 chars).
-
-        The list of IDs the game accepts lives in its pak data and is not checked here (UNVERIFIED).
+    def set_appearance(self, field: str, value, allowed=None) -> None:
+        """ID fields must be one of `allowed` (the game's own option list for that field, from its
+        GDSAvatar*Data tables) when given; otherwise they must keep the current ID's shape.
         """
         body = self._body
         if field not in body:
@@ -290,6 +371,10 @@ class SaveFile:
             value = int(value)
             if not 0 <= value <= 0xFF:
                 raise SaveFileError(f"{field} is a u8 (0..255)")
+        elif allowed is not None:
+            value = str(value)
+            if value not in allowed:
+                raise SaveFileError(f"{value} is not a {field} option the game defines")
         else:
             value = str(value)
             if not isinstance(cur, str) or len(value) != len(cur) or value[:-2] != cur[:-2] or not value[-2:].isdigit():
@@ -327,11 +412,14 @@ class SaveFile:
         it["stockNum"] = int(stock)
         self.dirty = True
 
-    def add_item(self, category: str, item_id: str, stock: int = 1) -> int:
+    def add_item(self, category: str, item_id: str, stock: int = 1, title: int | None = None,
+                 bonus: int = 0, skills: list[str] | tuple = (), quality: int = 0) -> int:
         """Clone the last real item in the category into the first trailing empty slot.
 
         Same approach as the community editor's add_item: copy an existing record, give it a fresh handle
-        and the next getOrder. Returns the slot index.
+        and the next getOrder. Equipment starts from the blank record of the free slot instead, so it doesn't
+        inherit the template's grade, bonus stat, skills or equipped marks; `title` (1-5), `quality` (0-3),
+        `bonus` (EEquipStatusType) and up to three `skills` set what it comes out as. Returns the slot index.
         """
         inv = self.inventory[category]
         handles, last_item, first_free = [], -1, -1
@@ -349,8 +437,25 @@ class SaveFile:
             raise SaveFileError(f"{category} is full")
         if "stockNum" in inv[last_item] and any(it["ItemId"] == item_id for it in inv):
             raise SaveFileError(f"{item_id} is already in {category}; change its stock instead")
-        new = copy.deepcopy(inv[last_item])
+        equip = "itemTitle" in inv[last_item]
+        new = copy.deepcopy(inv[first_free] if equip else inv[last_item])
         new["ItemId"] = item_id
+        if equip:
+            skills = [s for s in skills if s and s != "None"]
+            if len(skills) > len(new["grantSkillId"]) or len(set(skills)) != len(skills):
+                raise SaveFileError(f"up to {len(new['grantSkillId'])} different skills")
+            if not 0 <= int(bonus) < EQUIP_STATUS_MAX:
+                raise SaveFileError(f"bonus stat type must be 0..{EQUIP_STATUS_MAX - 1}")
+            new["itemTitle"] = inv[last_item]["itemTitle"] if title is None else int(title)
+            if not 0 <= new["itemTitle"] <= ITEM_TITLE_MAX:
+                raise SaveFileError(f"grade must be 1..{ITEM_TITLE_MAX}")
+            if not 0 <= int(quality) <= ITEM_QUALITY_MAX:
+                raise SaveFileError(f"quality must be 0..{ITEM_QUALITY_MAX}")
+            new["Quality"] = int(quality)
+            new["addEquipStatus"] = [{"Type": int(bonus), "Value": 0}]
+            new["grantSkillId"] = skills + ["None"] * (len(new["grantSkillId"]) - len(skills))
+        elif title is not None or bonus or skills or quality:
+            raise SaveFileError(f"{category} items have no grade, quality, bonus stat or skills")
         handle = None
         for h in reversed(handles):
             cand = h + (4 << 16) + 1
@@ -378,6 +483,15 @@ class SaveFile:
             raise SaveFileError("packed output failed verification")
         return out
 
+    def describe(self) -> dict:
+        """Who and when, for picking between copies of a save."""
+        from .records import _save_id, _ticks
+        pd = self.sd["m_PlayData"]
+        return {"path": str(self.path), "name": self.character_name, "island": self.island_name, "money": self.money,
+                "play_time": self.play_time_seconds, "started": _ticks(pd["startDateTime"]),
+                "saved": _ticks(pd["saveDateTime"]), "adventure": _save_id(self),
+                "sha256": hashlib.sha256(self.raw).hexdigest().upper()}
+
     def write(self, target: Path | None = None) -> dict:
         """Write to the save (default: the file it was loaded from). Game must be closed; backup first."""
         target = Path(target or self.path)
@@ -394,3 +508,19 @@ class SaveFile:
         self.dirty = False
         return {"target": str(target), "backup": str(backup) if backup else None,
                 "sha256": safety.sha256_file(target)}
+
+
+def restore_save(src: Path, target: Path) -> dict:
+    """Put a copy of a save back in place of `target`, byte for byte. The copy must open and repack byte-exact
+    (so a damaged or foreign file is refused before anything is touched); the current save is backed up first."""
+    src, target = Path(src), Path(target)
+    if src.resolve() == target.resolve():
+        raise SaveFileError("that is the save itself; pick a backup copy")
+    copy_ = SaveFile.load(src)
+    safety.require_game_closed()
+    before = safety.backup(target, "before-restore") if target.exists() else None
+    safety.atomic_write(target, copy_.raw)
+    if target.read_bytes() != copy_.raw:
+        raise SaveFileError("restored file does not match the backup copy")
+    return {"target": str(target), "from": str(src), "backup": str(before) if before else None,
+            "sha256": safety.sha256_file(target)}

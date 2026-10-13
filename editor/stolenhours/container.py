@@ -11,14 +11,17 @@ zlib level 6 / memLevel 8 / wbits 15 reproduces the game's compressed stream byt
 from __future__ import annotations
 
 import hashlib
+import mmap
+import re
 import struct
 import zlib
 from dataclasses import dataclass
+from pathlib import Path
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-from . import paths
+from . import paths, steam
 
 BLOCK = 16
 FOOTER_VERSION = 1
@@ -29,6 +32,49 @@ ZLIB_LEVEL = 6
 
 class ContainerError(ValueError):
     pass
+
+
+# The game exe holds the save key as a 32-character UTF-16LE string; candidates are tested against the save itself.
+KEY_CANDIDATE = re.compile(rb"(?<![\x20-\x7e]\x00)((?:[\x21-\x7e]\x00){32})\x00\x00")
+_found_key: bytes | None = None
+
+
+def key_from_game(exe: Path, raw: bytes) -> bytes | None:
+    """Finds the key in the user's own game binary: the one candidate that decrypts `raw` into a valid container."""
+    with open(exe, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+        seen = set()
+        for hit in KEY_CANDIDATE.finditer(m):
+            key = hit.group(1)[::2]
+            if key in seen:
+                continue
+            seen.add(key)
+            head = AES.new(key, AES.MODE_ECB).decrypt(raw[:BLOCK])
+            if head[4] & 0x0F != 8 or (head[4] << 8 | head[5]) % 31:  # zlib header after the size prefix
+                continue
+            try:
+                unpack(raw, key)
+            except ContainerError:
+                continue
+            return key
+    return None
+
+
+def resolve_key(raw: bytes | None = None) -> bytes:
+    """The project key file when present, otherwise the key read from the installed game."""
+    global _found_key
+    if paths.KEY_FILE.exists():
+        return load_key()
+    if _found_key:
+        return _found_key
+    if raw is None:
+        raise ContainerError("no key file, and no save given to test game keys against")
+    for game in steam.find_game_dirs():
+        key = key_from_game(game / steam.SHIPPING_REL, raw)
+        if key:
+            _found_key = key
+            return key
+    raise ContainerError("could not find the save key in the Fantasy Life i install "
+                         f"(set {steam.ENV_GAME} if the game is somewhere unusual)")
 
 
 def load_key(path=None) -> bytes:

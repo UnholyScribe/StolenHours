@@ -65,6 +65,18 @@ function MOCK.array(items)
     return setmetatable(a, { __index = function(_, k) if type(k) == "number" then return items[k] end end })
 end
 
+-- A TMap: entries are {key, value}; ForEach hands out RemoteUnrealParam-like wrappers like UE4SS does
+function MOCK.map(entries)
+    return {
+        ForEach = function(self, cb)
+            for _, kv in ipairs(entries) do
+                cb({ get = function() return kv[1] end }, { get = function() return kv[2] end })
+            end
+        end,
+    }
+end
+MOCK.fname = fname
+
 function MOCK.object(full, cls, values)
     local o = { _values = values or {} }
     local methods = {

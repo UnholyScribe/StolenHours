@@ -70,8 +70,16 @@ def mod(tmp_path):
 
 def test_ping_and_unknown(mod):
     _, send, *_ = mod
-    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.3.0"]
+    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.5.0"]
     assert send("a2\tNOPE")[1] == "ERR"
+
+
+def test_probe_and_map_keys(mod):
+    _, send, *_ = mod
+    assert send("p1\tPROBE\tGDDPlayData\tm_permanent.Money") == ["p1", "OK", "type=number value=14633"]
+    r = send("p2\tMAP_KEYS\tGDDPlayData\tm_permanent.Money")
+    assert r[1] == "ERR" and "not a container" in r[2]
+    assert send("p3\tPROBE\tNoSuchThing\tx")[1] == "ERR"
 
 
 def test_heartbeat(mod):
@@ -154,6 +162,51 @@ def test_ctrl_f9_keybind(mod):
     kb.fn()
     assert list(dumps.glob("values_*.txt"))
     assert any("Ctrl+F9 dump" in str(s) for s in rt.eval("MOCK.printed").values())
+
+
+QUESTS = r'''
+local F = MOCK.fname
+local qs = MOCK.class("Class /Script/DP1Project.GDDQuestStatus", {})
+MOCK.object("GDDQuestStatus /Engine/Transient.GDDQuestStatus_0", qs, {
+    m_permanent = { Active = MOCK.map({
+        { F("qsf_active_event_001_01"), { phase = 1 } },
+        { F("qsf_active_event_002_01"), { phase = 0 } },
+        { F("qsf_active_event_003_01"), { phase = 254 } },
+        { F("qsf_active_event_004_01"), { phase = 3 } },
+    }) },
+    m_volatile = { ActiveEventStatusV = { openActiveEventList = MOCK.array({
+        { activeEventId = F("qsf_active_event_001_01") },
+        { activeEventId = F("qsf_active_event_009_01") },
+    }) } },
+})
+local pcClass = MOCK.class("Class /Script/Engine.PlayerController", {})
+local pawnClass = MOCK.class("Class /Script/DP1Project.DP1PlayerCharacter", {})
+local pawn = MOCK.object("BP_Player_C /Game/Maps/Map_200000/Map_200000.Map_200000:PersistentLevel.BP_Player_C_0",
+    pawnClass, {
+        K2_GetActorLocation = function() return { X = 53982.0, Y = 38430.0, Z = 400.0 } end,
+        K2_GetActorRotation = function() return { Pitch = 0.0, Yaw = -90.0, Roll = 0.0 } end,
+    })
+MOCK.object("PlayerController /Game/Maps/Map_200000/Map_200000.Map_200000:PersistentLevel.PC_0", pcClass, { Pawn = pawn })
+'''
+
+
+def test_events_and_player(mod):
+    rt, send, *_ = mod
+    assert send("e0\tEVENTS")[1] == "ERR"
+    assert send("e0\tPLAYER")[1] == "ERR"
+    rt.execute(QUESTS)
+    r = send("e1\tEVENTS")
+    assert r[1] == "OK", r
+    assert r[2] == "3|qsf_active_event_001_01:1,qsf_active_event_004_01:3,qsf_active_event_009_01:open"
+    assert send("e2\tPLAYER") == ["e2", "OK", "53982.0,38430.0,400.0,-90.0,Map_200000"]
+
+
+def test_events_reports_unreadable_lists(mod):
+    rt, send, *_ = mod
+    rt.execute('MOCK.object("GDDQuestStatus /Engine/Transient.GDDQuestStatus_0", '
+               'MOCK.class("Class /Script/DP1Project.GDDQuestStatus", {}), { m_permanent = {} })')
+    r = send("e1\tEVENTS")
+    assert r[1] == "OK" and r[2].startswith("0||Active: ") and "open list: " in r[2]
 
 
 def test_builtin_dumpers_missing_is_reported(mod):

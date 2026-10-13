@@ -34,7 +34,7 @@ def cmd_info(args):
     sf = _load(args)
     h, m = divmod(sf.play_time_seconds // 60, 60)
     print(f"character  {sf.character_name}\nisland     {sf.island_name}\nmoney      {sf.money}\n"
-          f"life       {sf.current_life} ({savefile.LIFE_NAMES_UNVERIFIED.get(sf.current_life, '?')})\n"
+          f"life       {sf.current_life} ({savefile.LIFE_NAMES.get(sf.current_life, '?')})\n"
           f"play time  {h}h{m:02d}m\nitems      {len(sf.items())}")
     procs = safety.running_game_processes()
     print(f"game       {'RUNNING: ' + ', '.join(procs) if procs else 'closed'}")
@@ -233,12 +233,34 @@ def cmd_where(args):
 
 
 def cmd_gui(args):
-    from . import gui
     try:
         p = _save_path(args)
     except paths.NotFound:
         p = None
-    gui.main(p)
+    if args.classic:
+        from . import gui
+        gui.main(p)
+        return
+    from .webgui import app
+    app.main(p, browser=args.browser, port=args.port)
+
+
+def cmd_build_ui(args):
+    from . import avatar3d, collection, forge, mapevents, mapview, skillboard, uiassets
+    uiassets.extract(force=args.force)
+    uiassets.build()
+    avatar3d.extract(force=args.force)
+    avatar3d.build()
+    skillboard.extract(force=args.force)
+    skillboard.build()
+    mapevents.extract(force=args.force)
+    mapevents.build()
+    mapview.extract(force=args.force)
+    mapview.build()
+    collection.extract(force=args.force)
+    collection.build()
+    forge.extract(force=args.force)
+    forge.build()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -286,7 +308,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="show the detected Steam, game and save locations")
     p.add_argument("--game-dir", action="store_true", help="print only the game folder (for scripts)")
     p.set_defaults(fn=cmd_where)
-    sub.add_parser("gui", help="desktop editor").set_defaults(fn=cmd_gui)
+    p = sub.add_parser("gui", help="desktop editor (game-styled)")
+    p.add_argument("--classic", action="store_true", help="plain Tk editor instead")
+    p.add_argument("--browser", action="store_true", help="open in the web browser instead of a window")
+    p.add_argument("--port", type=int, default=0, help="fixed local port (default: random)")
+    p.set_defaults(fn=cmd_gui)
+    p = sub.add_parser("build-ui", help="extract the game's UI art and fonts for the editor (read-only on the game)")
+    p.add_argument("--force", action="store_true", help="re-extract even if files exist")
+    p.set_defaults(fn=cmd_build_ui)
     return ap
 
 

@@ -7,7 +7,7 @@ local LIVE_DIR = (os.getenv("LOCALAPPDATA") or ".") .. "\\StolenHours\\live\\"
 local CMD = LIVE_DIR .. "cmd.txt"
 local ACK = LIVE_DIR .. "ack.txt"
 local HEARTBEAT = LIVE_DIR .. "heartbeat.txt"
-local VERSION = "0.3.0"
+local VERSION = "0.5.0"
 local busy = false
 local Dump = require("stolenhours_dump")
 
@@ -38,7 +38,7 @@ end
 local function to_text(v)
     local t = type(v)
     if t == "number" or t == "boolean" or t == "string" or t == "nil" then return tostring(v) end
-    if t == "userdata" then
+    if t == "userdata" or t == "table" then
         if v.ToString then
             local ok, s = pcall(function() return v:ToString() end)
             if ok then return s end
@@ -175,6 +175,105 @@ handlers.SET = function(args)
         return false, "write did not stick: before " .. before .. ", wrote " .. tostring(value) .. ", now " .. after
     end
     return true, before .. " -> " .. after
+end
+
+-- PROBE <target> <path> : Lua type of the value and which container methods this UE4SS build offers on it
+handlers.PROBE = function(args)
+    local obj = resolve(args[1] or "")
+    if not obj then return false, "object not found: " .. tostring(args[1]) end
+    local v = read_path(obj, args[2] or "")
+    local parts = { "type=" .. type(v) }
+    if type(v) == "userdata" then
+        local okt, tn = pcall(function() return v:type() end)
+        if okt and tn then parts[#parts + 1] = "ue4ss=" .. tostring(tn) end
+        for _, m in ipairs({ "ForEach", "Find", "Add", "Remove", "Contains", "Empty", "GetArrayNum", "IsValid" }) do
+            local ok, f = pcall(function() return v[m] end)
+            if ok and f ~= nil then parts[#parts + 1] = m end
+        end
+    else
+        parts[#parts + 1] = "value=" .. to_text(v)
+    end
+    return true, table.concat(parts, " ")
+end
+
+-- MAP_KEYS <target> <path> : keys of a TMap / TSet (needs ForEach on this UE4SS build; max 400)
+handlers.MAP_KEYS = function(args)
+    local obj = resolve(args[1] or "")
+    if not obj then return false, "object not found: " .. tostring(args[1]) end
+    local v = read_path(obj, args[2] or "")
+    if type(v) ~= "userdata" then return false, "not a container: " .. type(v) end
+    local okf, each = pcall(function() return v.ForEach end)
+    if not okf or each == nil then return false, "this UE4SS build has no ForEach on " .. (args[2] or "") end
+    local keys = {}
+    v:ForEach(function(k)
+        if #keys < 400 then
+            if type(k) == "userdata" and k.get then k = k:get() end
+            keys[#keys + 1] = to_text(k)
+        end
+    end)
+    return true, #keys .. ": " .. table.concat(keys, ",")
+end
+
+local function unwrap(v)
+    if type(v) == "userdata" or type(v) == "table" then
+        local ok, inner = pcall(function() return v:get() end)
+        if ok and inner ~= nil then return inner end
+    end
+    return v
+end
+
+local function field(v, names)
+    for _, n in ipairs(names) do
+        local ok, x = pcall(function() return v[n] end)
+        if ok and x ~= nil then return unwrap(x) end
+    end
+    return nil
+end
+
+-- EVENTS : map events in play. "<id>:<phase>,..." from m_permanent.Active (phase 1-3), then ids only listed in
+-- m_volatile.ActiveEventStatusV.openActiveEventList as "<id>:open". Element layout of that list is UNVERIFIED,
+-- so it tries the likely id fields and falls back to the element's text.
+handlers.EVENTS = function()
+    local qs = resolve("GDDQuestStatus")
+    if not qs then return false, "GDDQuestStatus not found (is a save loaded?)" end
+    local out, seen, notes = {}, {}, {}
+    local function add(id, phase)
+        if id and id ~= "" and id ~= "None" and not seen[id] then
+            seen[id] = true
+            out[#out + 1] = id .. ":" .. phase
+        end
+    end
+    local ok, err = pcall(function()
+        unwrap(read_path(qs, "m_permanent.Active")):ForEach(function(k, v)
+            local phase = tonumber(to_text(field(unwrap(v), { "phase", "Phase" })))
+            if phase and phase >= 1 and phase <= 3 then add(to_text(unwrap(k)), phase) end
+        end)
+    end)
+    if not ok then notes[#notes + 1] = "Active: " .. tostring(err) end
+    ok, err = pcall(function()
+        unwrap(read_path(qs, "m_volatile.ActiveEventStatusV.openActiveEventList")):ForEach(function(_, e)
+            e = unwrap(e)
+            local boxed = type(e) == "userdata" or type(e) == "table"
+            local id = boxed and field(e, { "activeEventId", "questId", "ID", "id", "eventId" }) or e
+            add(to_text(id), "open")
+        end)
+    end)
+    if not ok then notes[#notes + 1] = "open list: " .. tostring(err) end
+    local text = #out .. "|" .. table.concat(out, ",")
+    if #notes > 0 then text = text .. "|" .. table.concat(notes, "; ") end
+    return true, text
+end
+
+-- PLAYER : "<X>,<Y>,<Z>,<yaw>,<map>" of the local player's pawn
+handlers.PLAYER = function()
+    local pc = FindFirstOf("PlayerController")
+    if not pc or not pc:IsValid() then return false, "no player controller" end
+    local pawn = pc.Pawn
+    if not pawn or not pawn:IsValid() then pawn = pc.AcknowledgedPawn end
+    if not pawn or not pawn:IsValid() then return false, "no player pawn (loading or in a menu?)" end
+    local loc, rot = pawn:K2_GetActorLocation(), pawn:K2_GetActorRotation()
+    local map = pawn:GetFullName():match("(Map_%d+)") or "?"
+    return true, string.format("%.1f,%.1f,%.1f,%.1f,%s", loc.X, loc.Y, loc.Z, rot.Yaw, map)
 end
 
 -- LIST_PROPS <target> : property names and current values of one object

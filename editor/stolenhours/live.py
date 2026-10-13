@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -31,6 +32,7 @@ class LiveBridge:
         self.cmd = self.dir / "cmd.txt"
         self.ack = self.dir / "ack.txt"
         self.heartbeat = self.dir / "heartbeat.txt"
+        self.lock = threading.Lock()  # one mailbox: the live map polls while other tabs send commands
 
     def mod_alive(self) -> bool:
         try:
@@ -39,6 +41,14 @@ class LiveBridge:
             return False
 
     def send(self, verb: str, *args: str, timeout: float = 10.0) -> Reply:
+        if not self.lock.acquire(timeout=timeout):
+            raise LiveError(f"the mod is busy with another command; {verb} not sent")
+        try:
+            return self._send(verb, *args, timeout=timeout)
+        finally:
+            self.lock.release()
+
+    def _send(self, verb: str, *args: str, timeout: float) -> Reply:
         if any("\t" in a or "\n" in a for a in (verb, *args)):
             raise LiveError("tabs and newlines are not allowed in commands")
         if not self.mod_alive():
@@ -92,3 +102,9 @@ class LiveBridge:
 
     def dump_builtin(self) -> Reply:
         return self.send("DUMP_BUILTIN", timeout=1800)
+
+    def events(self) -> Reply:
+        return self.send("EVENTS", timeout=10)
+
+    def player(self) -> Reply:
+        return self.send("PLAYER", timeout=5)

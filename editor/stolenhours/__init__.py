@@ -1,3 +1,3 @@
 """Stolen Hours: save editor and live controller for Fantasy Life i."""
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
