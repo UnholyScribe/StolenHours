@@ -64,10 +64,16 @@ class Backend:
             raise ApiError("no save loaded")
         return self.sf
 
-    def _item(self, it: savefile.Item) -> dict:
+    def _item(self, it: savefile.Item, rec: dict | None = None) -> dict:
         info = self.item_info.get(it.item_id, {})
-        return {"index": it.index, "id": it.item_id, "name": self.item_names.get(it.item_id, it.item_id),
-                "stock": it.stock, "category": it.category, "icon": info.get("icon", it.item_id)}
+        out = {"index": it.index, "id": it.item_id, "name": self.item_names.get(it.item_id, it.item_id),
+               "stock": it.stock, "category": it.category, "icon": info.get("icon", it.item_id)}
+        if rec and "itemTitle" in rec:
+            out["gear"] = {"grade": rec["itemTitle"], "quality": rec["Quality"],
+                           "bonus": rec["addEquipStatus"][0]["Type"] if rec["addEquipStatus"] else 0,
+                           "skills": [s for s in rec["grantSkillId"] if s and s != "None"],
+                           "equipped": bool(rec["equipped"])}
+        return out
 
     # ---- API -------------------------------------------------------------------
     def api_state(self) -> dict:
@@ -122,7 +128,8 @@ class Backend:
 
     def api_items(self, category: str) -> list:
         with self.lock:
-            return [self._item(it) for it in self._need().items(category)]
+            sf = self._need()
+            return [self._item(it, sf.inventory[it.category][it.index]) for it in sf.items(category)]
 
     def api_search_items(self, query: str, pocket: str = "", limit: int = 40) -> list:
         q = query.strip().lower()

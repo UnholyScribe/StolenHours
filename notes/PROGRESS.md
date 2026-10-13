@@ -294,6 +294,19 @@
   zip and images clean). README: Collection and Vulcan's Forge rows + screenshots. YouTube/Reddit not touched.
 - Drive backup refreshed (project zip + Rebuild Blueprint Doc); the old copies went to Drive's trash.
 
+## Bag shows what every item is (2026-10-13)
+- Unholy's report: the Bag panel showed no stats, even for his forged Bronze Pickaxe. Item descriptions in the
+  game tables are all the generic `desc_itm_common`, so the details come from the tables instead: new
+  `game/items/details.json` (built with forge.json): stats per grade for 1168 gear items, effect lines for 306
+  consumables (`effParam0..2` -> `GDSItemEffDescData` -> text, e.g. "Heal +300 HP"), 280 equipment skill texts.
+- `/api/items` now sends each gear record's grade, quality, bonus stat, skills and equipped mark. The panel
+  shows grade and quality tags, the stat at that grade, the bonus stat, skill texts and potion effects. The
+  pickaxe reads Notable, Top quality, Power 200, Gathering, +10 Mining, +30 Max SP, -10% Charge-up time.
+- Stat shown is the base for the grade; how much quality adds is UNVERIFIED (check: compare the in-game stat
+  of a Top item with the table value).
+- The dashed line above "Add to ..." (looked like a rendering strip) is gone; the band has a margin instead.
+- Tests 110 pass (new: details table and the gear fields /api/items returns). portable_check needs details.json.
+
 ## Next (Unholy's order, 2026-10-12)
 0. Side-by-side: in-game map vs Live Map (icons per event kind, glow size, ripple, player arrow position and
    facing). Mod 0.5.0 is installed.

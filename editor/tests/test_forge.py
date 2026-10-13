@@ -5,6 +5,7 @@ import pytest
 
 from conftest import SAMPLE_SAVE
 from stolenhours import container, forge, paths, savefile
+from stolenhours.webgui import server
 
 SWORD, ARMOR, POTION, POTION_PLUS = "iwp02000030", "iam01000600", "ics01000580", "ics01000590"
 
@@ -117,6 +118,23 @@ def test_forge_rejects(fg, cat, loaded):
         fg.craft(sf, "iwp99999999", cat)
     with pytest.raises(savefile.SaveFileError):
         sf.add_item("invConsume", "ics01000600", 1, title=2)
+
+
+def test_item_details(fg, cat, loaded):
+    if not forge.DETAILS_FILE.exists():
+        pytest.skip("details.json not built")
+    det = json.loads(forge.DETAILS_FILE.read_text(encoding="utf-8"))
+    assert det["gear"][SWORD]["stats"] == [["Attack", [180, 210, 250, 1, 1]]]
+    assert "Heal +300 HP" in det["effects"][POTION_PLUS]
+    assert det["skills"]["es_alchemy_up02"]["desc"] == "+4 Alchemy"
+    sf = fresh(loaded)
+    fg.craft(sf, SWORD, cat, 1, grade=3, bonus=True, skills=fg.items[SWORD]["pools"][2][:1], quality=2)
+    be = server.Backend()
+    be.sf = sf
+    new = be.api_items("invWeapon")[-1]
+    assert new["gear"] == {"grade": 3, "quality": 2, "bonus": 3, "skills": fg.items[SWORD]["pools"][2][:1],
+                           "equipped": False}
+    assert all("gear" not in it for it in be.api_items("invConsume"))
 
 
 def test_bag_add_doesnt_copy_template_gear_state(loaded):

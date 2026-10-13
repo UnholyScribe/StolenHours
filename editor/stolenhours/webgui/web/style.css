@@ -447,6 +447,14 @@ input[type=number].ev-clock { width: 66px; padding-right: 6px; }
 }
 .detail-icon { width: 128px; height: 128px; object-fit: contain; display: block; margin: 0 auto; filter: drop-shadow(0 6px 6px rgba(0,0,0,.2)); }
 .detail-name { font-family: var(--heading); font-size: 22px; text-align: center; margin-top: 8px; }
+.band-gap { margin-top: 26px; }
+.it-details { margin-top: 10px; background: rgba(255,255,255,.55); border-radius: 12px; padding: 8px 12px; }
+.it-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 6px; }
+.it-tags span { padding: 2px 10px; border-radius: 10px; background: #c79a3e; color: #fff; font-size: 12px; font-weight: 700; }
+.it-stat { display: flex; justify-content: space-between; padding: 3px 2px; border-bottom: 1px dashed var(--cream-line); color: var(--ink); }
+.it-skill { padding: 3px 2px; color: #3f7a12; font-weight: 600; }
+.it-skill.none { color: var(--ink-soft); font-weight: 400; }
+.it-hint { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
 .stepper { display: flex; align-items: center; gap: 8px; }
 .stepper button {
   width: 44px; height: 44px; flex: 0 0 auto; cursor: pointer; border: 0;

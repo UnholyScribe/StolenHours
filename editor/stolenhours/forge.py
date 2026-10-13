@@ -34,7 +34,8 @@ from .collection import GAME_DATA, _nouns, _rows, _texts
 from .savefile import SaveFile, SaveFileError
 
 DATA_FILE = paths.UI_ASSET_DIR / "forge" / "forge.json"
-DATA_PATTERN = (r"^Game/Content/GameData/(Recipe/GDSRecipe(Data|TabData)|Item/GDSItem(Weapon|LifeTools|Armor|Title)Data|"
+DETAILS_FILE = paths.UI_ASSET_DIR / "items" / "details.json"
+DATA_PATTERN = (r"^Game/Content/GameData/(Recipe/GDSRecipe(Data|TabData)|Item/GDSItem\w*Data|Item/GDSItemText|"
                 r"Item/GDSAdd(Skill|Status)LotTable|Item/GDSItemText_Noun|Skill/GDSSkill(Data|Text|Text_Noun)|"
                 r"Menu/GDSMenuText)\.uasset$")
 GEAR = {"Weapon": [("Attack", "physicalOffenseList"), ("Magic Attack", "magicOffenseList")],
@@ -49,7 +50,7 @@ FORGE_MAX = 99
 
 def extract(force: bool = False) -> None:
     if force or not (GAME_DATA / "Item" / "GDSAddSkillLotTable.json").exists() \
-            or not (GAME_DATA / "Skill" / "GDSSkillText_Noun.json").exists():
+            or not (GAME_DATA / "Item" / "GDSItemEffDescData.json").exists():
         uiassets._run_extractor("json", DATA_PATTERN)
 
 
@@ -110,14 +111,8 @@ def build(out: Path | None = None, log=print) -> dict:
             e.update({k: gear[iid][k] for k in ("stats", "grades", "bonus", "pools")})
     used = sorted({s for e in items.values() for p in e.get("pools", []) for s in p})
     skill_table = skillboard._Table("GDSSkillData")
-    skills = {}
-    for sid in used:
-        row = skill_rows.get(sid, {})
-        name = skill_noun.get(row.get("nameTextID")) or skill_text.get(row.get("nameTextID")) or sid
-        args = [skill_table.arg(a) for a in row.get("Params", {}).get("prm", []) if a["m_dataSize"]] if row else []
-        desc = re.sub(r"<SKILL_PARAM_(\d+)>", lambda m: str(args[int(m.group(1)) - 1]) if int(m.group(1)) <= len(args)
-                      else "?", skill_text.get(row.get("dascTextId"), ""))
-        skills[sid] = {"name": name, "desc": desc}
+    skills = {sid: _skill_info(sid, skill_rows, skill_noun, skill_text, skill_table) for sid in used}
+    _build_details(gear, grades, qualities, skill_rows, skill_noun, skill_text, skill_table, log)
     made = set(items) | {e["plus"] for e in items.values() if "plus" in e}
     flags = {k: item_flags[k] for k in sorted(made) if k in item_flags}
 
@@ -130,6 +125,46 @@ def build(out: Path | None = None, log=print) -> dict:
     log(f"forge: {len(items)} craftable items ({n_gear} gear, {sum(1 for e in items.values() if 'plus' in e)} with a "
         f"+ version), {len(skills)} skills -> {out}")
     return {"items": len(items), "gear": n_gear}
+
+
+def _skill_info(sid, rows, noun, text, table) -> dict:
+    row = rows.get(sid, {})
+    name = noun.get(row.get("nameTextID")) or text.get(row.get("nameTextID")) or sid
+    args = [table.arg(a) for a in row.get("Params", {}).get("prm", []) if a["m_dataSize"]] if row else []
+    desc = re.sub(r"<SKILL_PARAM_(\d+)>", lambda m: str(args[int(m.group(1)) - 1]) if int(m.group(1)) <= len(args)
+                  else "?", text.get(row.get("dascTextId"), ""))
+    return {"name": name, "desc": desc}
+
+
+def _build_details(gear, grades, qualities, skill_rows, skill_noun, skill_text, skill_table, log) -> None:
+    """`game/items/details.json`: what the Bag shows for an item (gear stats per grade, consumable effects)."""
+    item_text = _texts("Item/GDSItemText.json")
+    eff_desc = {k: v["DescId"] for k, v in _rows("Item/GDSItemEffDescData.json").items()}
+    effects = {}
+    for f in (GAME_DATA / "Item").glob("GDSItem*Data.json"):
+        try:
+            rows = _rows(f"Item/{f.name}")
+        except (KeyError, IndexError, ValueError):
+            continue
+        for iid, v in rows.items():
+            if not isinstance(v, dict) or "effParam0" not in v:
+                continue
+            lines = []
+            for n in range(3):
+                p = v.get(f"effParam{n}") or {}
+                tmpl = item_text.get(eff_desc.get(p.get("effDescId"), ""), "")
+                if tmpl:
+                    lines.append(tmpl.replace("<ITEM_EFF_VAL>", str(p.get("val", ""))).replace("<ITEM_EFF_TIME>", str(p.get("Time", ""))))
+            if lines:
+                effects[iid] = lines
+    skills = {sid: _skill_info(sid, skill_rows, skill_noun, skill_text, skill_table)
+              for sid in skill_rows if sid.startswith("es_")}
+    data = {"grades": {str(k): v for k, v in grades.items()}, "qualities": {str(k): v for k, v in qualities.items()},
+            "status": STATUS_NAMES, "skills": skills, "effects": effects,
+            "gear": {k: {"stats": v["stats"], "grades": v["grades"]} for k, v in gear.items()}}
+    DETAILS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    DETAILS_FILE.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    log(f"item details: {len(gear)} gear, {len(effects)} with effects, {len(skills)} equipment skills -> {DETAILS_FILE}")
 
 
 class Forge:

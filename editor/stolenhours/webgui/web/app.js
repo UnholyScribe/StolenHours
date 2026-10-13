@@ -501,6 +501,7 @@ async function sbEdit(action, p) {
 
 // ---------- Bag ----------
 async function loadItems() {
+  if (!S.details) S.details = await fetch("game/items/details.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   S.items = await attempt(() => api("items", { category: S.cat })) || [];
   if (S.item) S.item = S.items.find((i) => i.index === S.item.index) || null;
 }
@@ -538,6 +539,7 @@ function drawInventory() {
         <img class="detail-icon" src="game/items/${h(it.icon || it.id)}.png" alt="" onerror="this.style.visibility='hidden'">
         <div class="detail-name">${h(it.name)}</div>
         <div class="muted" style="text-align:center">${h(it.id)} · slot ${it.index}</div>
+        ${itemDetails(it)}
         ${it.stock != null ? `
           <label class="field-label">Quantity</label>
           <div class="stepper"><button class="minus" data-step="-1"></button><input type="number" id="it-stock" min="1" max="65535" value="${it.stock}"><button class="plus" data-step="1"></button></div>
@@ -545,8 +547,7 @@ function drawInventory() {
           <button class="btn btn-green btn-small" id="it-set" style="margin-left:auto">Set</button></div>`
         : `<div class="note">This pocket holds single items (no stack count).</div>`}` :
         `<div class="muted" style="text-align:center;padding:10px">Select something on the left to change its quantity.</div>`}
-      <div class="divider"></div>
-      <div class="band"><span>Add to ${h(pocketName(S.cat))}</span></div>
+      <div class="band band-gap"><span>Add to ${h(pocketName(S.cat))}</span></div>
       <input type="text" id="add-q" placeholder="Name or id..." title="Search ${h(pocketName(S.cat))} by name or id">
       <div class="results scroll" id="add-results"></div>
       <div class="row" style="margin-top:8px">
@@ -580,6 +581,28 @@ function drawInventory() {
       afterEdit(null, `Added ${S.addPick.name}`);
     }
   };
+}
+function itemDetails(it) {
+  const D = S.details;
+  if (!D) return "";
+  const rows = [];
+  const g = it.gear, info = D.gear[it.id];
+  if (g) {
+    const tags = [g.grade ? D.grades[g.grade] : "", `${D.qualities[g.quality] || g.quality} quality`, g.equipped ? "Equipped" : ""].filter(Boolean);
+    rows.push(`<div class="it-tags">${tags.map((t) => `<span>${h(t)}</span>`).join("")}</div>`);
+    if (info && g.grade) {
+      for (const [label, list] of info.stats) {
+        const v = list[g.grade - 1];
+        rows.push(`<div class="it-stat"><span>${h(label)}</span><b>${v > 1 ? fmt(v) : "—"}</b></div>`);
+      }
+    }
+    if (g.bonus) rows.push(`<div class="it-stat"><span>Bonus stat</span><b>${h(D.status[g.bonus] || g.bonus)}</b></div>`);
+    for (const s of g.skills) rows.push(`<div class="it-skill">${h(D.skills[s]?.desc || D.skills[s]?.name || s)}</div>`);
+    if (!g.skills.length) rows.push(`<div class="it-skill none">No skills</div>`);
+    if (g.quality) rows.push(`<div class="it-hint">Stats shown are the base for this grade; the game adds the quality bonus on top.</div>`);
+  }
+  for (const e of D.effects[it.id] || []) rows.push(`<div class="it-skill">${h(e)}</div>`);
+  return rows.length ? `<div class="it-details">${rows.join("")}</div>` : "";
 }
 function drawResults() {
   const box = $("#add-results");
