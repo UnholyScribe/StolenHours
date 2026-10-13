@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import time
 import webbrowser
 from pathlib import Path
 
+from .. import deck
 from . import server
 
 
@@ -16,6 +18,8 @@ def main(save_path: Path | None = None, browser: bool = False, port: int = 0) ->
         import webview
     except ImportError:
         webview = None
+    if deck.under_wine() and not os.environ.get("STOLENHOURS_WEBVIEW"):
+        browser = True  # WebView2 rarely runs under Proton; pywebview would fall back to the old IE engine
     if browser or webview is None:
         print(f"Stolen Hours editor: {url}  (Ctrl+C to stop)")
         webbrowser.open(url)

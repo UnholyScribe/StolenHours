@@ -12,7 +12,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import paths
+from . import deck, paths
 
 
 class SafetyError(RuntimeError):
@@ -28,12 +28,16 @@ def sha256_file(path: Path) -> str:
 
 
 def running_game_processes() -> list[str]:
-    out = subprocess.run(
-        ["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    ).stdout
-    wanted = {n.lower() for n in paths.GAME_PROCESS_NAMES}
-    return sorted({row[0] for row in csv.reader(io.StringIO(out)) if row and row[0].lower() in wanted})
+    # under Proton the game runs in its own Wine prefix, which tasklist can't see
+    found = set(deck.running_on_host(paths.GAME_PROCESS_NAMES)) if deck.on_linux_host() else set()
+    if os.name == "nt":
+        out = subprocess.run(
+            ["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        ).stdout
+        wanted = {n.lower() for n in paths.GAME_PROCESS_NAMES}
+        found |= {row[0] for row in csv.reader(io.StringIO(out)) if row and row[0].lower() in wanted}
+    return sorted(found)
 
 
 def require_game_closed() -> None:

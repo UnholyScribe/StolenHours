@@ -45,6 +45,13 @@ Nothing is hardcoded. `StolenHours.cmd where` shows what was detected:
   Steam login (`config\loginusers.vdf`), then the newest file. Direct-launch saves
   (`%LOCALAPPDATA%\Game\Saved\SaveGames`) are listed after Steam ones. The GUI dropdown lists all of them.
 - Overrides: `STOLENHOURS_STEAM_DIR`, `STOLENHOURS_GAME_DIR`, `STOLENHOURS_SAVE`, or `--save` / `-GameDir`.
+- Under Proton (Steam Deck): also `~/.local/share/Steam` and flatpak Steam through `Z:`, Linux library paths
+  mapped to `Z:`, and the game-running check reads `/proc` (`stolenhours\deck.py`).
+
+## Steam Deck
+The exe build ships `StolenHours-Deck.sh` and `STEAM_DECK.txt`: add the script as a non-Steam game; it runs the exe
+through Proton and opens the editor full screen in a browser for Game Mode. Controller and keyboard navigation
+(`web\pad.js`) work everywhere, Windows too. Launcher dry run: `wsl bash research/deck_launcher_check.sh`.
 
 ## Locations on Unholy's PC (checked 2026-10-11)
 | What | Path |

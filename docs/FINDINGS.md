@@ -124,3 +124,15 @@ Open questions (each needs one in-game check by Unholy):
 | Better consumables | Separate item ids: `GDSRecipeData.rewardData.rank2_itemId` (700 recipes) e.g. ics01000580 HP Potion -> ics01000590 HP Potion +; `GDSItemQualityGroup` has the same pairs (729). | Verified (data) |
 | Craft quality | Separate from grade: `Quality` on gear = `EItemQualityType` 0-3, names `name_item_quality_000..003` Normal, Good, Great, Top. Players report the minigame gives Good with 3+ turns left, Great 5+, Top 7+. Every gear item in Unholy's save has 0. | Names verified (data); Quality 1-3 showing and raising stats UNVERIFIED: forge Top, load, check the item |
 | Blank gear record | Every empty gear slot holds a full default `InventoryInfoEquip` (title 0, Type 0, skills None, not equipped); `add_item` now builds new gear from it. | Verified (save) |
+| Item details | Item `DescId` is `desc_itm_common` (empty) on every item, so the Bag shows table data: gear stats per grade (as above), consumable effects `effParam0..2` {val, Time, effDescId} -> `GDSItemEffDescData`.DescId -> `GDSItemText` with `<ITEM_EFF_VAL>`/`<ITEM_EFF_TIME>` (ics01000590 "Heal +300 HP"), skill text from `GDSSkillData`. | Verified (data) |
+
+## 2026-10-13 (Steam Deck / Proton)
+
+Nothing here was run on a Deck or under Wine yet (no Wine on this PC). Checks: Unholy follows `STEAM_DECK.txt`.
+
+| Question | Answer | Status |
+|---|---|---|
+| Save on the Deck | Steam keeps it outside the game's Proton prefix, same layout as Windows: `~/.local/share/Steam/userdata/<account>/2993780/remote/*gamedata.bin`. The editor (own prefix) reads it as `Z:\home\deck\...`; libraryfolders.vdf holds Linux paths (SD card `/run/media/...`), mapped to `Z:`. | UNVERIFIED: start the editor on the Deck, title screen lists the save |
+| Game-running check | The game runs in its own prefix, so tasklist can't see it; the editor also reads `/proc/<pid>/cmdline` and `comm` (15 chars, `NFL1-Win64-Ship`) through `Z:\proc`. | UNVERIFIED: game open, Save to file must refuse |
+| Window | pywebview needs WebView2, which rarely works under Proton (it would fall back to the IE engine). Under Wine the exe serves only; `StolenHours-Deck.sh` runs it with `proton run` in `~/.local/share/StolenHours/compat` and opens a Chromium/Edge/Firefox flatpak in kiosk mode, which Game Mode shows. Flatpak browsers see controllers only with `--filesystem=/run/udev:ro` (Valve's cloud-gaming setup); the script adds it. | Launcher dry run passes in WSL (`research/deck_launcher_check.sh`, stub Proton/browser); real Proton + Game Mode UNVERIFIED |
+| Controller | Browser Gamepad API, standard mapping (Xbox order; PlayStation ids `054c`/DualSense get PS glyphs). Steam Input's default layout shows as an Xbox 360 pad. Keyboard templates work too (arrows, Enter, Escape). | Verified in the editor with a simulated pad and keys; on a real Deck UNVERIFIED |

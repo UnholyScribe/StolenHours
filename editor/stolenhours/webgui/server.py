@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 import secrets
+import subprocess
 import threading
 import time
 import traceback
@@ -328,7 +329,10 @@ class Backend:
 
     def api_open_backups(self) -> None:
         paths.BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
-        os.startfile(paths.BACKUP_ROOT)
+        if os.name == "nt":
+            os.startfile(paths.BACKUP_ROOT)
+        else:
+            subprocess.Popen(["xdg-open", str(paths.BACKUP_ROOT)])
 
     def api_pick(self, mode: str, name: str = "") -> dict:
         """Native Save As / Open dialog; {"path": None} if cancelled, {"manual": True} without a window."""
@@ -553,7 +557,7 @@ class Handler(BaseHTTPRequestHandler):
         body = target.read_bytes()
         if rel == "index.html":
             # WebView2 can keep stale scripts despite no-store; versioned URLs force a fresh fetch
-            v = str(int(max((WEB_DIR / n).stat().st_mtime for n in ("app.js", "style.css", "look3d.js"))))
+            v = str(int(max((WEB_DIR / n).stat().st_mtime for n in ("app.js", "pad.js", "style.css", "look3d.js"))))
             body = body.replace(b"{{v}}", v.encode())
         self._send(200, body, mimetypes.guess_type(target.name)[0] or "application/octet-stream",
                    cache=rel.startswith("game/"))

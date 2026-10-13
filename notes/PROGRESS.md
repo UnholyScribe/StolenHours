@@ -307,6 +307,28 @@
 - The dashed line above "Add to ..." (looked like a rendering strip) is gone; the band has a margin instead.
 - Tests 110 pass (new: details table and the gear fields /api/items returns). portable_check needs details.json.
 
+## Steam Deck and controller support (2026-10-13)
+- Unholy's ask: fully runnable on his Steam Deck (Proton) and fully navigable with a controller, Xbox or
+  PlayStation.
+- Controller: new `web/pad.js`. D-pad/left stick move a blue highlight to the nearest control (anything with a
+  click handler counts, so future tabs work without wiring); A press, B back, LB/RB screens, LT/RT page, right
+  stick scroll, Start jumps to Save, View to the screen list. Dropdowns open a big list; number fields change
+  with the D-pad; text fields take the Steam keyboard. Y gives a pointer for the maps, skill board and 3D preview
+  (hold A to drag, right stick zooms). Hint bar with Xbox or PlayStation glyphs. Arrows/Enter/Escape do the same.
+  Checked in the preview at 1280x800 with a simulated pad: title, Bag, Vulcan (dropdown, count), dialogs,
+  Live Map drag/zoom, skill board panels and details, keyboard.
+- Layout: the board's middle row no longer grows past the window (Save bar was off-screen below ~1000 px since
+  the 11th tab); nav buttons shrink to fit; tighter frame under 860 px tall.
+- Proton: new `deck.py` (Wine detection, Linux Steam folders and SD-card libraries as `Z:` paths, game-running
+  check through /proc); under Wine the exe skips WebView2 and serves. `editor/deck/StolenHours-Deck.sh` +
+  `STEAM_DECK.txt` ship next to the exe: the script picks the newest Proton, runs the exe in its own prefix,
+  shows a "Starting" box, opens a kiosk browser (Edge/Chrome/Chromium/Brave/Firefox flatpak), and on exit stops
+  only its own prefix. User data on Linux goes to ~/.local/share/StolenHours.
+- Tests: `test_deck.py` (fake Deck under Z:, SD card library, flatpak Steam, /proc check, save lock) and
+  `research/deck_launcher_check.sh` (WSL dry run with stub Proton and browser, all checks ok).
+- UNVERIFIED until Unholy tries it on the Deck: real Proton run, Game Mode window, controller in the flatpak
+  browser, game-running check. Live features (mod) not set up for Proton.
+
 ## Next (Unholy's order, 2026-10-12)
 0. Side-by-side: in-game map vs Live Map (icons per event kind, glow size, ripple, player arrow position and
    facing). Mod 0.5.0 is installed.

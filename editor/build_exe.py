@@ -17,6 +17,7 @@ from stolenhours import modinstall, paths
 
 EDITOR = Path(__file__).resolve().parent
 WEB = paths.PACKAGE_DIR / "webgui" / "web"
+DECK = EDITOR / "deck"  # Steam Deck launcher and instructions, shipped next to the exe
 PARSER_DATA = ("fli_sav_pattern.txt", "itemlist.txt", "skilllist.txt", "flaglist.txt")
 
 
@@ -68,6 +69,8 @@ def main(dest: Path) -> None:
             sys.exit(f"{dest} exists and is not a previous build; refusing to replace it")
         shutil.rmtree(dest, onexc=_set_aside)
     shutil.copytree(out, dest, dirs_exist_ok=True)
+    for f in DECK.iterdir():
+        (dest / f.name).write_bytes(f.read_bytes().replace(b"\r\n", b"\n"))  # bash refuses CRLF scripts
     shutil.rmtree(work, ignore_errors=True)
     print(f"built {dest / 'StolenHours.exe'}")
 

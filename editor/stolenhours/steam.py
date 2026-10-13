@@ -1,6 +1,6 @@
-"""Find Steam, the game install and the save folder on any Windows machine.
+"""Find Steam, the game install and the save folder on any Windows machine, or on a Steam Deck under Proton.
 
-Order for each lookup: environment override, Steam's own records (registry, libraryfolders.vdf,
+Order for each lookup: environment override, Steam's own records (registry, Linux Steam folders, libraryfolders.vdf,
 appmanifest_2993780.acf, loginusers.vdf), then a shallow scan of common folders on every drive.
 """
 
@@ -11,6 +11,8 @@ import re
 import string
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from . import deck
 
 APP_ID = "2993780"
 SHIPPING_REL = Path("Game") / "Binaries" / "Win64" / "NFL1-Win64-Shipping.exe"
@@ -115,7 +117,7 @@ def find_steam_roots() -> list[Path]:
     cands: list[Path] = []
     if os.environ.get(ENV_STEAM):
         cands.append(Path(os.environ[ENV_STEAM]))
-    out = _valid_roots(cands + _registry_steam_paths())
+    out = _valid_roots(cands + _registry_steam_paths() + deck.linux_steam_roots())
     if out:
         return out
     # Probing drive letters can stall on disconnected network drives, so only when Steam told us nothing.
@@ -129,9 +131,9 @@ def library_folders(steam_root: Path) -> list[Path]:
         data = _ci(_read_vdf(steam_root / name), "libraryfolders") or {}
         for k, v in data.items():
             if isinstance(v, dict) and _ci(v, "path"):
-                libs.append(Path(_ci(v, "path")))
+                libs.append(deck.host_path(_ci(v, "path")))
             elif k.isdigit() and isinstance(v, str):
-                libs.append(Path(v))
+                libs.append(deck.host_path(v))
     seen, out = set(), []
     for p in libs:
         if str(p).lower() not in seen:

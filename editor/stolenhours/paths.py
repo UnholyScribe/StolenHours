@@ -9,7 +9,10 @@ from pathlib import Path
 from . import steam
 
 FROZEN = getattr(sys, "frozen", False)
-USER_DATA = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours"
+if os.name == "nt":
+    USER_DATA = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours"
+else:
+    USER_DATA = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "StolenHours"
 
 if FROZEN:
     # standalone exe: no project folder; the save key is read from the user's own game install (container.resolve_key)
@@ -30,8 +33,8 @@ ITEM_LIST_FILE = COMMUNITY_EDITOR / "itemlist.txt"
 
 SAVE_FILE_NAME = "002DAE74-00-gamedata.bin"
 GAME_PROCESS_NAMES = ("NFL1-Win64-Shipping.exe", "NFL1.exe", "EACLauncher.exe", "GameBootstrapper.exe")
-LIVE_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours" / "live"
-DUMPS_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "StolenHours" / "dumps"
+LIVE_DIR = USER_DATA / "live"
+DUMPS_DIR = USER_DATA / "dumps"
 
 
 class NotFound(RuntimeError):
