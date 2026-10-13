@@ -26,6 +26,8 @@ through Steam.
 | Map | Which map events show up, time and weather |
 | Live Map | Every map with towers, towns, shrines, shops, campfires, gathering spots and monsters; live map events and where you are while the game runs |
 | Time Hook | Change the running game (Dosh) |
+| Collection | Learn recipes, fill in the Encyclopedia, claim gifts again, gift codes with their rewards |
+| Vulcan's Forge | Craft any recipe's item out of game and pick how it comes out: grade (Ordinary to Legendary, as far as that item goes), quality (Normal to Top), bonus stat and skills, or the + version of food and potions |
 | Records | Your play records |
 | Backups | Automatic backups, one-click restore |
 
@@ -40,6 +42,7 @@ small mod for you (from either tab) once UE4SS is there. Everything else works o
 | **Skill board**<br>![Skill board](images/skillboard.png) | **Bag**<br>![Bag](images/bag.png) |
 | **Look**<br>![Look](images/look.png) | **Map**<br>![Map](images/map.png) |
 | **Live Map**<br>![Live Map](images/livemap.png) | **Time Hook**<br>![Time Hook](images/timehook.png) |
+| **Collection**<br>![Collection](images/collection.png) | **Vulcan's Forge**<br>![Vulcan's Forge](images/vulcan.png) |
 | **Records**<br>![Records](images/records.png) | **Backups**<br>![Backups](images/backups.png) |
 
 ## Keeping your save safe
