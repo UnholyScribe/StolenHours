@@ -30,10 +30,15 @@ through Steam.
 The Live Map's places work on their own; its live events, your position and the Time Hook need [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) in the game. The editor installs its own
 small mod for you (from either tab) once UE4SS is there. Everything else works on the save file alone.
 
+## Every tab
+
 | | |
 |---|---|
-| ![Skill board](images/skillboard.png) | ![Bag](images/bag.png) |
-| ![Look](images/look.png) | ![Live Map](images/livemap.png) |
+| **Adventurer**<br>![Adventurer](images/adventurer.png) | **Licenses**<br>![Licenses](images/licenses.png) |
+| **Skill board**<br>![Skill board](images/skillboard.png) | **Bag**<br>![Bag](images/bag.png) |
+| **Look**<br>![Look](images/look.png) | **Map**<br>![Map](images/map.png) |
+| **Live Map**<br>![Live Map](images/livemap.png) | **Time Hook**<br>![Time Hook](images/timehook.png) |
+| **Records**<br>![Records](images/records.png) | **Backups**<br>![Backups](images/backups.png) |
 
 ## Keeping your save safe
 
@@ -44,7 +49,6 @@ small mod for you (from either tab) once UE4SS is there. Everything else works o
 
 Still, keep your own copy of your save. Use it offline and at your own risk; don't take edited saves into multiplayer.
 
-![Backups](images/backups.png)
 
 ## Credits
 
