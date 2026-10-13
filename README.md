@@ -4,6 +4,8 @@ A free save editor for **Fantasy Life i: The Girl Who Steals Time** (PC, Steam).
 
 ![Adventurer](images/adventurer.png)
 
+Watch the 1-minute tour on [YouTube](https://youtu.be/HJLNRAUg9rw).
+
 ## Download
 
 Get the latest zip from [Releases](../../releases), unzip it anywhere and run `StolenHours.exe`.
