@@ -125,6 +125,7 @@ Open questions (each needs one in-game check by Unholy):
 | Craft quality | Separate from grade: `Quality` on gear = `EItemQualityType` 0-3, names `name_item_quality_000..003` Normal, Good, Great, Top. Players report the minigame gives Good with 3+ turns left, Great 5+, Top 7+. Every gear item in Unholy's save has 0. | Names verified (data); Quality 1-3 showing and raising stats UNVERIFIED: forge Top, load, check the item |
 | Blank gear record | Every empty gear slot holds a full default `InventoryInfoEquip` (title 0, Type 0, skills None, not equipped); `add_item` now builds new gear from it. | Verified (save) |
 | Item details | Item `DescId` is `desc_itm_common` (empty) on every item, so the Bag shows table data: gear stats per grade (as above), consumable effects `effParam0..2` {val, Time, effDescId} -> `GDSItemEffDescData`.DescId -> `GDSItemText` with `<ITEM_EFF_VAL>`/`<ITEM_EFF_TIME>` (ics01000590 "Heal +300 HP"), skill text from `GDSSkillData`. | Verified (data) |
+| Item prices | `priceInfo.priceSellRichList` / `priceBuyRichList` are 5-entry lists; gear indexes by grade-1 (ilt02000020 sell [550,920,1480,0,0]), other items use entry 0 (ics01000590 sell 60, buy 190). Whether quality changes the price is UNVERIFIED (check: sell a Top-quality vs Normal copy in game). | Verified (data) |
 
 ## 2026-10-13 (Steam Deck / Proton)
 
