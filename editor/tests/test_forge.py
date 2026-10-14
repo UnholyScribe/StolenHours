@@ -126,6 +126,7 @@ def test_item_details(fg, cat, loaded):
     det = json.loads(forge.DETAILS_FILE.read_text(encoding="utf-8"))
     assert det["gear"][SWORD]["stats"] == [["Attack", [180, 210, 250, 1, 1]]]
     assert "Heal +300 HP" in det["effects"][POTION_PLUS]
+    assert det["prices"][POTION_PLUS]["sell"][0] == 60 and det["prices"]["ilt02000020"]["sell"][:3] == [550, 920, 1480]
     assert det["skills"]["es_alchemy_up02"]["desc"] == "+4 Alchemy"
     sf = fresh(loaded)
     fg.craft(sf, SWORD, cat, 1, grade=3, bonus=True, skills=fg.items[SWORD]["pools"][2][:1], quality=2)

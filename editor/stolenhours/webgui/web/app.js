@@ -602,6 +602,12 @@ function itemDetails(it) {
     if (g.quality) rows.push(`<div class="it-hint">Stats shown are the base for this grade; the game adds the quality bonus on top.</div>`);
   }
   for (const e of D.effects[it.id] || []) rows.push(`<div class="it-skill">${h(e)}</div>`);
+  const price = D.prices?.[it.id], at = g?.grade ? g.grade - 1 : 0;
+  if (price?.sell[at]) {
+    const total = it.stock > 1 ? ` <small>(${fmt(it.stock)}: ${fmt(price.sell[at] * it.stock)})</small>` : "";
+    rows.push(`<div class="it-stat"><span>Sells for</span><b>${fmt(price.sell[at])} Dosh${total}</b></div>`);
+  }
+  if (price?.buy[at]) rows.push(`<div class="it-stat"><span>Shop price</span><b>${fmt(price.buy[at])} Dosh</b></div>`);
   return rows.length ? `<div class="it-details">${rows.join("")}</div>` : "";
 }
 function drawResults() {

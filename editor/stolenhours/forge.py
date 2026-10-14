@@ -140,14 +140,20 @@ def _build_details(gear, grades, qualities, skill_rows, skill_noun, skill_text, 
     """`game/items/details.json`: what the Bag shows for an item (gear stats per grade, consumable effects)."""
     item_text = _texts("Item/GDSItemText.json")
     eff_desc = {k: v["DescId"] for k, v in _rows("Item/GDSItemEffDescData.json").items()}
-    effects = {}
+    effects, prices = {}, {}  # prices per grade (index grade-1; non-gear uses the first)
     for f in (GAME_DATA / "Item").glob("GDSItem*Data.json"):
         try:
             rows = _rows(f"Item/{f.name}")
         except (KeyError, IndexError, ValueError):
             continue
         for iid, v in rows.items():
-            if not isinstance(v, dict) or "effParam0" not in v:
+            if not isinstance(v, dict):
+                continue
+            price = (v.get("priceInfo") or {})
+            sell, buy = price.get("priceSellRichList") or [], price.get("priceBuyRichList") or []
+            if any(sell) or any(buy):
+                prices[iid] = {"sell": sell, "buy": buy}
+            if "effParam0" not in v:
                 continue
             lines = []
             for n in range(3):
@@ -160,11 +166,12 @@ def _build_details(gear, grades, qualities, skill_rows, skill_noun, skill_text, 
     skills = {sid: _skill_info(sid, skill_rows, skill_noun, skill_text, skill_table)
               for sid in skill_rows if sid.startswith("es_")}
     data = {"grades": {str(k): v for k, v in grades.items()}, "qualities": {str(k): v for k, v in qualities.items()},
-            "status": STATUS_NAMES, "skills": skills, "effects": effects,
+            "status": STATUS_NAMES, "skills": skills, "effects": effects, "prices": prices,
             "gear": {k: {"stats": v["stats"], "grades": v["grades"]} for k, v in gear.items()}}
     DETAILS_FILE.parent.mkdir(parents=True, exist_ok=True)
     DETAILS_FILE.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    log(f"item details: {len(gear)} gear, {len(effects)} with effects, {len(skills)} equipment skills -> {DETAILS_FILE}")
+    log(f"item details: {len(gear)} gear, {len(effects)} with effects, {len(prices)} with prices, "
+        f"{len(skills)} equipment skills -> {DETAILS_FILE}")
 
 
 class Forge:
