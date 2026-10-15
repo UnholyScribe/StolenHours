@@ -246,7 +246,8 @@ def cmd_gui(args):
 
 
 def cmd_build_ui(args):
-    from . import avatar3d, collection, forge, mapevents, mapview, skillboard, uiassets
+    from . import (avatar3d, collection, companions, forge, island, mapevents, mapview, skillboard,
+                   uiassets)
     uiassets.extract(force=args.force)
     uiassets.build()
     avatar3d.extract(force=args.force)
@@ -261,6 +262,10 @@ def cmd_build_ui(args):
     collection.build()
     forge.extract(force=args.force)
     forge.build()
+    island.extract(force=args.force)
+    island.build()
+    companions.extract(force=args.force)
+    companions.build()
 
 
 def build_parser() -> argparse.ArgumentParser:

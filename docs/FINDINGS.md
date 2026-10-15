@@ -127,6 +127,15 @@ Open questions (each needs one in-game check by Unholy):
 | Item details | Item `DescId` is `desc_itm_common` (empty) on every item, so the Bag shows table data: gear stats per grade (as above), consumable effects `effParam0..2` {val, Time, effDescId} -> `GDSItemEffDescData`.DescId -> `GDSItemText` with `<ITEM_EFF_VAL>`/`<ITEM_EFF_TIME>` (ics01000590 "Heal +300 HP"), skill text from `GDSSkillData`. | Verified (data) |
 | Item prices | `priceInfo.priceSellRichList` / `priceBuyRichList` are 5-entry lists; gear indexes by grade-1 (ilt02000020 sell [550,920,1480,0,0]), other items use entry 0 (ics01000590 sell 60, buy 190). Whether quality changes the price is UNVERIFIED (check: sell a Top-quality vs Normal copy in game). | Verified (data) |
 
+## 2026-10-15 (island build, debris, companions)
+
+| Question | Answer | Status |
+|---|---|---|
+| Three maps | Personal = Base Camp `Map_000100`; Past = The Depths `Map_000101` (craft floors `Map_000202`/`212`/`222`); Big = Ginormosia `Map_200000`. Live Map already had all three plus the story islands. | Verified (GDSWorldMapData + obstacle tables) |
+| Debris clear | `GlobalSyncByteFlag[idx]` = 255 when cleared (`GDSGlobalSyncByteFlag`); matching `craftObjStatusP` (`refCraftObjId`) is zeroed and its handle drops from `craftObjStHdlArray`. Sample: `obstacle_Map_000100_myhouse` flag 255 and `obstacle_myhouse` gone after Unholy cleared the house in game. `obstacleReleaseNum` still 0 there — counter vs flags UNVERIFIED. | Flag + craft wipe verified (save); editor clear load-tested UNVERIFIED |
+| Terraform | `craftObjStatusPArray` `land_obj`/`water_obj`; `objStatusBitFlag` bit 1 = `Shave`. 314 Shave cells on Unholy's Base Camp. Exact raise/lower meaning UNVERIFIED (toggle one cell, load, compare height). | Structure verified (pattern + save) |
+| Companions | Follower = `m_PartyStatus.m_followerCharaInfo.m_followerId` (Trip `chr100400`). Friends = `m_CharaStatus.m_stFriendP` (64 slots, empty on this save). Catalog: 50 encyclopedia characters + named NPCs. Filling a friend slot UNVERIFIED until load-tested. | Fields verified (save); add-friend in game UNVERIFIED |
+
 ## 2026-10-13 (Steam Deck / Proton)
 
 Nothing here was run on a Deck or under Wine yet (no Wine on this PC). Checks: Unholy follows `STEAM_DECK.txt`.

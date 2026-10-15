@@ -16,8 +16,8 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from .. import (collection, forge, gear, live, mapevents, mapview, modinstall, paths, records, safety, savefile,
-                skilltree, uiassets)
+from .. import (collection, companions, forge, gear, island, live, mapevents, mapview, modinstall, paths, records,
+                safety, savefile, skilltree, uiassets)
 
 WEB_DIR = paths.PACKAGE_DIR / "webgui" / "web"
 LIVE_DOSH = ("GDDPlayData", "m_permanent.Money")
@@ -453,6 +453,64 @@ class Backend:
         res["name"] = self.item_names.get(res["item"], res["item"])
         res["summary"] = self.api_summary()
         return res
+
+    # ---- Island (debris, terrain) + Buddies --------------------------------------
+    def _island(self) -> island.Island:
+        if getattr(self, "_island_data", None) is None:
+            try:
+                self._island_data = island.Island.load()
+            except FileNotFoundError:
+                raise ApiError("island data not built; run: py -3.12 -m stolenhours build-ui")
+        return self._island_data
+
+    def api_island(self) -> dict:
+        with self.lock:
+            return self._island().state(self._need())
+
+    def api_island_edit(self, action: str, ids: list | None = None) -> dict:
+        isl = self._island()
+        with self.lock:
+            sf = self._need()
+            if action == "clear":
+                note = f"cleared {isl.clear_obstacles(sf, list(ids or []))} debris site(s)"
+            elif action == "clear_all":
+                left = [o["id"] for o in isl.state(sf)["obstacles"] if not o["cleared"]]
+                note = f"cleared {isl.clear_obstacles(sf, left)} debris site(s)"
+            elif action == "reset_shave":
+                note = f"reset Shave on {isl.reset_shave(sf)} terrain cell(s)"
+            else:
+                raise ApiError(f"unknown island action {action}")
+            return {"island": isl.state(sf), "note": note, "summary": self.api_summary()}
+
+    def _companions(self) -> companions.Companions:
+        if getattr(self, "_companions_data", None) is None:
+            try:
+                self._companions_data = companions.Companions.load()
+            except FileNotFoundError:
+                raise ApiError("companions data not built; run: py -3.12 -m stolenhours build-ui")
+        return self._companions_data
+
+    def api_companions(self) -> dict:
+        with self.lock:
+            return self._companions().state(self._need())
+
+    def api_companions_edit(self, action: str, id: str | None = None, slot: int | None = None,
+                            friendship: int = 0, level: int = 1) -> dict:
+        c = self._companions()
+        with self.lock:
+            sf = self._need()
+            if action == "follower":
+                who = c.set_follower(sf, id)
+                note = "follower cleared" if who == "cleared" else f"follower set to {c.name_of(who)}"
+            elif action == "add":
+                row = c.add_friend(sf, str(id), int(friendship or 0), int(level or 1))
+                note = f"added {row['name']} to buddies (slot {row['slot']})"
+            elif action == "remove":
+                n = c.remove_friend(sf, chara_id=id, slot=None if slot is None else int(slot))
+                note = f"removed {n} buddy(ies)"
+            else:
+                raise ApiError(f"unknown companions action {action}")
+            return {"companions": c.state(sf), "note": note, "summary": self.api_summary()}
 
     def api_mod_status(self) -> dict:
         return modinstall.status()

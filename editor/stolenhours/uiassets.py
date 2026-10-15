@@ -92,6 +92,7 @@ SINGLES = {
     "nav_livemap.png": "tex_icon_screentitle_000180",
     "nav_collection.png": "tex_icon_screentitle_000040",
     "nav_forge.png": "tex_icon_screentitle_000130",
+    "nav_island.png": "tex_icon_screentitle_000100",
 }
 FONTS = {
     "fonts/heading.otf": "L5_Latin_DP1_SF01-Bold.ufont",

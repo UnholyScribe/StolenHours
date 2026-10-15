@@ -36,8 +36,8 @@ const MAIN_POCKETS = Object.keys(POCKETS);
 const SCREENS = {
   overview: ["Adventurer", "nav_overview"], lives: ["Licenses", "nav_lives"], inventory: ["Bag", "nav_inventory"],
   appearance: ["Look", "nav_appearance"], map: ["Map", "nav_map"], livemap: ["Live Map", "nav_livemap"],
-  live: ["Time Hook", "nav_live"], collection: ["Collection", "nav_collection"], forge: ["Vulcan's Forge", "nav_forge"],
-  file: ["Records", "nav_file"], backups: ["Backups", "nav_backups"],
+  island: ["Island", "nav_island"], live: ["Time Hook", "nav_live"], collection: ["Collection", "nav_collection"],
+  forge: ["Vulcan's Forge", "nav_forge"], file: ["Records", "nav_file"], backups: ["Backups", "nav_backups"],
 };
 
 // ---------- feedback ----------
@@ -133,7 +133,8 @@ function render() {
   $("#top-dosh").textContent = fmt(S.sum?.money);
   const lives = () => (S.boardLife ? vBoard() : vLives());
   const fn = { overview: vOverview, lives, inventory: vInventory, appearance: vAppearance, map: vMap,
-    livemap: vLiveMap, live: vLive, collection: vCollection, forge: vForge, file: vFile, backups: vBackups }[S.view];
+    livemap: vLiveMap, island: vIsland, live: vLive, collection: vCollection, forge: vForge, file: vFile,
+    backups: vBackups }[S.view];
   fn();
   updateButtons();
 }
@@ -1268,6 +1269,182 @@ function vLive() {
   $("#live-ping").onclick = () => liveCall("ping");
   $("#live-dump").onclick = () => liveCall("dump", "", "dump");
   $("#live-probe").onclick = () => liveCall("probe_events", "", "probe map events");
+}
+
+// ---------- Island: debris, terrain, buddies ----------
+const ISL_TABS = [["debris", "Debris"], ["terrain", "Terrain"], ["buddies", "Buddies"]];
+const ISL_GROUPS = {
+  base: "Base Camp", depths_b1: "Depths – B1", depths_b2: "Depths – B2", depths_b3: "Depths – B3", other: "Other",
+};
+
+async function vIsland() {
+  if (S.islKeep) S.islKeep = false;
+  else {
+    const [isl, bud] = await Promise.all([
+      attempt(() => api("island")),
+      attempt(() => api("companions")),
+    ]);
+    if (!isl || !bud || S.view !== "island") return;
+    S.isl = isl; S.bud = bud;
+  }
+  S.islTab ||= "debris";
+  S.islGroup ||= "base";
+  S.islQ ||= "";
+  drawIsland();
+}
+function drawIsland() {
+  const t = S.islTab;
+  $("#view").innerHTML = `
+  <div class="view cols" style="grid-template-columns: minmax(0, 1fr) 320px">
+    <div class="panel" style="display:flex;flex-direction:column;min-height:0;padding:0 18px 14px">
+      <div class="band"><span>Island</span></div>
+      <div class="tabs">${ISL_TABS.map(([k, label]) =>
+        `<button class="tab ${t === k ? "active" : ""}" data-isltab="${k}">${label}</button>`).join("")}</div>
+      <div id="isl-body" class="col-body"></div>
+    </div>
+    <div class="panel scroll"><div class="pad" id="isl-side"></div></div>
+  </div>`;
+  $$("[data-isltab]").forEach((b) => (b.onclick = () => { S.islTab = b.dataset.isltab; S.islQ = ""; drawIsland(); }));
+  ({ debris: islDebris, terrain: islTerrain, buddies: islBuddies })[t]();
+}
+async function islEdit(action, args = {}) {
+  const r = await attempt(() => api("island_edit", { action, ...args }));
+  if (!r) return;
+  S.isl = r.island; S.islKeep = true;
+  afterEdit(r.summary, r.note.charAt(0).toUpperCase() + r.note.slice(1));
+  drawIsland();
+}
+async function budEdit(action, args = {}) {
+  const r = await attempt(() => api("companions_edit", { action, ...args }));
+  if (!r) return;
+  S.bud = r.companions; S.islKeep = true;
+  afterEdit(r.summary, r.note.charAt(0).toUpperCase() + r.note.slice(1));
+  drawIsland();
+}
+function islDebris() {
+  const order = Object.keys(ISL_GROUPS);
+  const isl = S.isl, groups = Object.keys(isl.groups || {}).sort((a, b) => {
+    const ia = order.includes(a) ? order.indexOf(a) : 99, ib = order.includes(b) ? order.indexOf(b) : 99;
+    return ia - ib || a.localeCompare(b);
+  });
+  if (!groups.includes(S.islGroup)) S.islGroup = groups[0] || "base";
+  const rows = (isl.groups[S.islGroup] || []).filter((o) =>
+    !S.islQ || o.name.toLowerCase().includes(S.islQ) || o.id.toLowerCase().includes(S.islQ));
+  const left = rows.filter((o) => !o.cleared);
+  $("#isl-body").innerHTML = `
+    <div class="row col-filters">
+      <select id="isl-group">${groups.map((g) =>
+        `<option value="${g}" ${S.islGroup === g ? "selected" : ""}>${h(ISL_GROUPS[g] || g)} (${(isl.groups[g] || []).filter((o) => !o.cleared).length} left)</option>`).join("")}</select>
+      <input id="isl-q" type="search" placeholder="Search debris…" value="${h(S.islQ)}" style="flex:1">
+    </div>
+    <div class="row" style="gap:8px;margin:4px 0 10px">
+      <button class="btn btn-green btn-small" id="isl-clear-shown" ${left.length ? "" : "disabled"}>Clear shown (${left.length})</button>
+      <button class="btn btn-cream btn-small" id="isl-clear-all" ${isl.remaining ? "" : "disabled"}>Clear all remaining (${isl.remaining})</button>
+    </div>
+    <div id="col-list" class="col-list">${rows.length ? rows.map((o) => `
+      <div class="col-row ${o.cleared ? "on" : ""}">
+        <div class="col-main">
+          <div class="col-title">${h(o.name)}${o.cleared ? " · cleared" : ""}</div>
+          <div class="col-sub muted">${h(o.type)}${o.friends ? ` · needs ${o.friends} buddy(ies)` : ""}
+            ${o.rewardName ? ` · reward ${h(o.rewardName)} ×${o.rewardNum}` : ""}
+            ${o.craftPresent ? " · craft object still placed" : ""}</div>
+        </div>
+        <button class="btn ${o.cleared ? "btn-cream" : "btn-green"} btn-small shrink" data-islclear="${h(o.id)}"
+          ${o.cleared ? "disabled" : ""}>${o.cleared ? "Cleared" : "Clear"}</button>
+      </div>`).join("") : `<div class="muted" style="padding:12px 2px">No debris in this group.</div>`}</div>`;
+  $("#isl-side").innerHTML = `
+    <div class="band"><span>Maps</span></div>
+    <div class="note">Personal island = Base Camp. Past = The Depths (craft floors B1–B3). Big island = Ginormosia
+      (area ranks below). Live Map already shows all three.</div>
+    <div class="it-stat"><span>Debris cleared</span><b>${isl.cleared} / ${isl.cleared + isl.remaining}</b></div>
+    <div class="it-stat"><span>obstacleReleaseNum</span><b>${fmt(isl.obstacleReleaseNum)}</b></div>
+    <div class="band" style="margin-top:14px"><span>Ginormosia areas</span></div>
+    ${(isl.huge || []).map((a) => `<div class="it-stat"><span>${h(a.id)}</span><b>rank ${a.rank} · ${fmt(a.points)} pts</b></div>`).join("") ||
+      `<div class="muted">No area data.</div>`}
+    <div class="note" style="margin-top:12px">Clearing sets the game's sync flag to 255 and removes the debris craft
+      object, matching the starter house after you cleared it in game. Load the save and check the island.</div>`;
+  $("#isl-group").onchange = () => { S.islGroup = $("#isl-group").value; drawIsland(); };
+  $("#isl-q").oninput = () => { S.islQ = $("#isl-q").value.trim().toLowerCase(); drawIsland(); };
+  $$("[data-islclear]").forEach((b) => (b.onclick = () => islEdit("clear", { ids: [b.dataset.islclear] })));
+  $("#isl-clear-shown").onclick = async () => {
+    if (await confirmDlg("Clear shown debris?", `Clear ${left.length} site(s) on this map?`))
+      islEdit("clear", { ids: left.map((o) => o.id) });
+  };
+  $("#isl-clear-all").onclick = async () => {
+    if (await confirmDlg("Clear every debris site?", `Clear all ${isl.remaining} remaining site(s) on every island map?`))
+      islEdit("clear_all");
+  };
+}
+function islTerrain() {
+  const t = S.isl.terrain || {};
+  $("#isl-body").innerHTML = `
+    <div class="note">The save stores Base Camp as a voxel craft grid. Raised / lowered cells use the craft object's
+      <b>Shave</b> bit on <code>land_obj</code> / <code>water_obj</code>. Full raise/lower painting is next; for now you
+      can see the counts and undo every Shave edit.</div>
+    <div class="it-stat"><span>Land cells</span><b>${fmt(t.land)} (${fmt(t.shavedLand)} shaved)</b></div>
+    <div class="it-stat"><span>Water cells</span><b>${fmt(t.water)} (${fmt(t.shavedWater)} shaved)</b></div>
+    <div class="it-stat"><span>Other shaved</span><b>${fmt(t.otherShave)}</b></div>
+    <div class="it-stat"><span>Total Shave flags</span><b>${fmt(t.shaved)}</b></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-cream" id="isl-reset-shave" ${t.shaved ? "" : "disabled"}>Reset all Shave flags</button>
+    </div>`;
+  $("#isl-side").innerHTML = `
+    <div class="band"><span>Terraforming</span></div>
+    <div class="note">UNVERIFIED: whether Shave means raised, lowered, or flattened versus the default height map.
+      Reset is for undoing editor experiments. Check one cell in game after a reset.</div>`;
+  $("#isl-reset-shave").onclick = async () => {
+    if (await confirmDlg("Reset terrain Shave flags?", `Clear the Shave bit on ${fmt(t.shaved)} cell(s)?`))
+      islEdit("reset_shave");
+  };
+}
+function islBuddies() {
+  const b = S.bud, q = S.islQ || "";
+  const catalog = [...(b.buddies || []), ...(b.extras || [])]
+    .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
+    .filter((c) => !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+  const have = new Set((b.friends || []).map((f) => f.id));
+  $("#isl-body").innerHTML = `
+    <div class="row col-filters">
+      <input id="isl-q" type="search" placeholder="Search buddies…" value="${h(S.islQ)}" style="flex:1">
+    </div>
+    <div class="band"><span>In your save</span></div>
+    <div class="ev-live">${(b.friends || []).length ? b.friends.map((f) => `
+      <div class="ev-live-row"><span>${h(f.name)}<small>Lv ${f.level} · friendship ${f.friendship} · ${h(f.id)}</small></span>
+        <button class="ev-x" data-budrm="${h(f.id)}" title="Remove">✕</button></div>`).join("")
+      : `<div class="muted" style="padding:8px 2px">No buddies in the friend roster yet.</div>`}</div>
+    <div class="band" style="margin-top:12px"><span>All buddies</span></div>
+    <div id="col-list" class="col-list">${catalog.map((c) => `
+      <div class="col-row ${have.has(c.id) ? "on" : ""}">
+        <div class="col-main">
+          <div class="col-title">${h(c.name)}</div>
+          <div class="col-sub muted">${h(c.id)}${c.library ? " · encyclopedia" : ""}</div>
+        </div>
+        <button class="btn ${have.has(c.id) ? "btn-cream" : "btn-green"} btn-small shrink" data-budadd="${h(c.id)}"
+          ${have.has(c.id) ? "disabled" : ""}>${have.has(c.id) ? "In list" : "Add"}</button>
+      </div>`).join("")}</div>`;
+  const fol = b.follower || {};
+  $("#isl-side").innerHTML = `
+    <div class="band"><span>Follower</span></div>
+    <div class="it-stat"><span>Current</span><b>${h(fol.name || "None")}</b></div>
+    <label class="field-label" for="bud-fol">Set follower</label>
+    <select id="bud-fol">
+      <option value="None">None</option>
+      ${(b.followers || []).map((f) =>
+        `<option value="${h(f.id)}" ${fol.id === f.id ? "selected" : ""}>${h(f.name)}</option>`).join("")}
+    </select>
+    <button class="btn btn-green btn-small" id="bud-fol-set" style="margin-top:8px">Apply</button>
+    <div class="band" style="margin-top:14px"><span>Party</span></div>
+    ${(b.party || []).map((p) => `<div class="it-stat"><span>${p.leader ? "Leader" : "Slot"}</span><b>${h(p.who)}</b></div>`).join("")}
+    <div class="it-stat"><span>Free buddy slots</span><b>${b.slotsFree} / 64</b></div>
+    <div class="note" style="margin-top:12px">Adding a buddy fills an empty friend slot. That path is UNVERIFIED in game
+      until you load a save that had a real recruit and compare. Follower is a single name field (Trip on your save).</div>`;
+  $("#isl-q").oninput = () => { S.islQ = $("#isl-q").value.trim().toLowerCase(); drawIsland(); };
+  $$("[data-budadd]").forEach((btn) => (btn.onclick = () => budEdit("add", { id: btn.dataset.budadd })));
+  $$("[data-budrm]").forEach((btn) => (btn.onclick = async () => {
+    if (await confirmDlg("Remove buddy?", `Remove ${btn.dataset.budrm} from the friend roster?`))
+      budEdit("remove", { id: btn.dataset.budrm });
+  }));
+  $("#bud-fol-set").onclick = () => budEdit("follower", { id: $("#bud-fol").value });
 }
 
 // ---------- Collection: recipes, library, gifts ----------

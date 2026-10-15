@@ -329,6 +329,18 @@
 - UNVERIFIED until Unholy tries it on the Deck: real Proton run, Game Mode window, controller in the flatpak
   browser, game-running check. Live features (mod) not set up for Proton.
 
+## Island tab: debris, terrain, buddies (2026-10-15)
+- Unholy's ask: all three maps (personal / past / big), clear debris for building, figure out terraforming,
+  full companion list to edit in/out. Don't report until it's in the tool.
+- Maps: Base Camp (`Map_000100`), The Depths + craft floors B1–B3, Ginormosia (`Map_200000`). Live Map already
+  had the art; Island tab edits the save-side build state.
+- New `island.py` + `companions.py` (build-ui -> `game/island/island.json`, `game/companions/companions.json`).
+  Debris: 59 sync-flag sites; clear sets flag 255, zeros the craft object, drops the area handle (matches the
+  cleared house on Unholy's save). Terrain: Shave-bit counts + reset. Buddies: 50 encyclopedia + extras, follower
+  set/clear (Trip), add/remove friend slots (add path UNVERIFIED in game).
+- UI: Island nav tab with Debris / Terrain / Buddies. Tests: 6 new (island + companions) pass.
+- UNVERIFIED in game: clear a reclaim pile and load; reset Shave; add a buddy and load.
+
 ## Next (Unholy's order, 2026-10-12)
 0. Side-by-side: in-game map vs Live Map (icons per event kind, glow size, ripple, player arrow position and
    facing). Mod 0.5.0 is installed.
