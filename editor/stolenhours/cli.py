@@ -212,6 +212,18 @@ def cmd_analyze_dump(args):
     _analyze(args, args.file)
 
 
+def cmd_rewalk(args):
+    from . import rewalk
+    if args.status:
+        print(json.dumps(rewalk.status(), indent=2, default=str))
+        return
+    report = rewalk.rewalk(force=args.force, fetch_assets=not args.offline,
+                           rebuild=args.rebuild, prefer_game_key=True)
+    print(json.dumps(report, indent=2, default=str))
+    if not report.get("ok"):
+        raise SystemExit(1)
+
+
 def cmd_where(args):
     if args.game_dir:
         print(paths.game_dir())
@@ -313,6 +325,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="show the detected Steam, game and save locations")
     p.add_argument("--game-dir", action="store_true", help="print only the game folder (for scripts)")
     p.set_defaults(fn=cmd_where)
+    p = sub.add_parser("rewalk", help="re-find the game after a Steam update (paths, save key, pak/usmap cache)")
+    p.add_argument("--status", action="store_true", help="show fingerprint and cache only")
+    p.add_argument("--force", action="store_true", help="rewalk even if the buildid looks unchanged")
+    p.add_argument("--offline", action="store_true", help="skip fetching pak key / usmap from FLi-FModel")
+    p.add_argument("--rebuild", action="store_true", help="also re-run build-ui when tooling is present")
+    p.set_defaults(fn=cmd_rewalk)
     p = sub.add_parser("gui", help="desktop editor (game-styled)")
     p.add_argument("--classic", action="store_true", help="plain Tk editor instead")
     p.add_argument("--browser", action="store_true", help="open in the web browser instead of a window")

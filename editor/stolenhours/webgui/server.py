@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .. import (collection, companions, forge, gear, island, live, mapevents, mapview, modinstall, paths, records,
-                safety, savefile, skilltree, uiassets)
+                rewalk, safety, savefile, skilltree, uiassets)
 
 WEB_DIR = paths.PACKAGE_DIR / "webgui" / "web"
 LIVE_DOSH = ("GDDPlayData", "m_permanent.Money")
@@ -512,6 +512,13 @@ class Backend:
                 raise ApiError(f"unknown companions action {action}")
             return {"companions": c.state(sf), "note": note, "summary": self.api_summary()}
 
+    def api_rewalk_status(self) -> dict:
+        return rewalk.status()
+
+    def api_rewalk(self, force: bool = True, offline: bool = False, rebuild: bool = False) -> dict:
+        return rewalk.rewalk(force=bool(force), fetch_assets=not bool(offline), rebuild=bool(rebuild),
+                             prefer_game_key=True)
+
     def api_mod_status(self) -> dict:
         return modinstall.status()
 
@@ -662,7 +669,18 @@ def start(save_path: Path | None = None, port: int = 0, token: str | None = None
 
 
 def ensure_assets(log=print) -> None:
-    """Build the UI art from the extracted game files when possible; the UI still works without it."""
+    """Build the UI art from the extracted game files when possible; the UI still works without it.
+
+    Also rewalks the install when Steam's buildid / shipping exe fingerprint changed so a game update
+    cannot leave the editor stuck on a stale save key.
+    """
+    try:
+        report = rewalk.ensure_current(auto_fetch=True)
+        if report.get("changed"):
+            log(f"game update detected; rewalked in {report.get('seconds', '?')}s "
+                f"(key={'ok' if (report.get('key') or {}).get('ok') else 'failed'})")
+    except Exception as e:
+        log(f"rewalk on start skipped ({e})")
     if (paths.UI_ASSET_DIR / "wallpaper.jpg").exists():
         return
     try:

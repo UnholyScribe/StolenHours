@@ -1773,6 +1773,21 @@ function recDelta(r) {
   const txt = r.key === "playTime" ? `${Math.floor(Math.abs(d) / 3600)}h ${Math.floor((Math.abs(d) % 3600) / 60)}m` : fmt(Math.abs(d));
   return `<span class="rec-delta ${d < 0 ? "down" : ""}" title="Change since the editor started tracking this save">${d < 0 ? "−" : "+"}${txt}</span>`;
 }
+async function fillRewalk() {
+  const box = $("#rewalk-box");
+  if (!box) return;
+  const st = await attempt(() => api("rewalk_status"));
+  if (!st) { box.textContent = "Could not read game fingerprint."; return; }
+  const fp = st.fingerprint || {};
+  const bits = [
+    fp.ok ? `build ${fp.buildid || "?"}` : "game not found",
+    st.key_ok ? "save key ok" : "save key needs rewalk",
+    st.changed ? "fingerprint changed — will rewalk on start" : "fingerprint current",
+    st.cache?.using_cache_pak ? "pak/usmap cache ready" : "pak/usmap from project (or missing)",
+  ];
+  box.innerHTML = `<div class="it-stat"><span>Install</span><b>${h(shortPath(fp.game || "?"))}</b></div>
+    <div class="muted">${bits.map(h).join(" · ")}</div>`;
+}
 async function vFile() {
   const st = S.state || {}, s = S.sum;
   const rec = await attempt(() => api("records"));
@@ -1802,9 +1817,19 @@ async function vFile() {
       <label class="field-label">Open another save</label>
       <div class="row"><select id="file-select">${(st.saves || []).map((p) => `<option ${p === s.path ? "selected" : ""} value="${h(p)}">${h(shortPath(p))}</option>`).join("")}</select>
         <button class="btn btn-cream btn-small shrink" id="file-open">Open</button></div>
-      <div class="note">Before every write the editor checks the game is closed, that the file hasn't changed since it was loaded, and makes a backup with a SHA-256. The packed file is re-read and verified before and after writing.</div>
+      <div class="band" style="margin-top:14px"><span>Game install</span></div>
+      <div id="rewalk-box" class="muted">Checking…</div>
+      <button class="btn btn-cream btn-small" id="rewalk-btn" style="margin-top:8px">Rewalk game</button>
+      <div class="note">Before every write the editor checks the game is closed, that the file hasn't changed since it was loaded, and makes a backup with a SHA-256. The packed file is re-read and verified before and after writing. After a Steam update it re-finds the install and save key on its own; Rewalk forces that now.</div>
     </div></div>
   </div>`;
+  fillRewalk();
+  $("#rewalk-btn").onclick = async () => {
+    const r = await busy("Rewalking game…", () => attempt(() => api("rewalk", { force: true })));
+    if (!r) return;
+    toast(r.ok ? `Rewalk ok (${r.seconds}s)` : "Rewalk failed", !r.ok);
+    fillRewalk();
+  };
   $("#rec-apply").onclick = async () => {
     const values = {};
     for (const i of $$("[data-rec]")) {

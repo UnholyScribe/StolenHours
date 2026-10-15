@@ -60,12 +60,32 @@ def key_from_game(exe: Path, raw: bytes) -> bytes | None:
 
 
 def resolve_key(raw: bytes | None = None) -> bytes:
-    """The project key file when present, otherwise the key read from the installed game."""
+    """Project key file when it still decrypts the save; otherwise scan the installed game exe.
+
+    After a Steam update the key file can be stale. When `raw` is given we only keep the file key if it
+    actually unpacks; otherwise we re-walk every Fantasy Life i install for a UTF-16LE candidate that works.
+    """
     global _found_key
-    if paths.KEY_FILE.exists():
-        return load_key()
-    if _found_key:
+    if _found_key and raw is not None:
+        try:
+            unpack(raw, _found_key)
+            return _found_key
+        except ContainerError:
+            _found_key = None
+    elif _found_key and raw is None:
         return _found_key
+
+    if paths.KEY_FILE.exists():
+        file_key = load_key()
+        if raw is None:
+            return file_key
+        try:
+            unpack(raw, file_key)
+            _found_key = file_key
+            return file_key
+        except ContainerError:
+            pass  # stale after an update — fall through to the game binary
+
     if raw is None:
         raise ContainerError("no key file, and no save given to test game keys against")
     for game in steam.find_game_dirs():

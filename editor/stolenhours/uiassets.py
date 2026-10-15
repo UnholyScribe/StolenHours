@@ -106,9 +106,10 @@ PORTRAIT_PX = 512
 def _run_extractor(mode: str, pattern: str) -> None:
     if not EXTRACTOR_DLL.exists():
         subprocess.run(["dotnet", "build", "-c", "Release", "-nologo", "-v", "q"], cwd=EXTRACTOR, check=True)
-    key = paths.PAK_KEY_FILE.read_text().strip()
+    from . import rewalk
+    key = rewalk.pak_key_path().read_text().strip()
     paks = paths.game_dir() / "Game" / "Content" / "Paks"
-    subprocess.run(["dotnet", str(EXTRACTOR_DLL), str(paks), key, str(paths.MAPPINGS_FILE), mode, pattern,
+    subprocess.run(["dotnet", str(EXTRACTOR_DLL), str(paks), key, str(rewalk.mappings_path()), mode, pattern,
                     str(paths.EXTRACT_DIR)], check=True)
 
 

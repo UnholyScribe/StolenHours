@@ -127,6 +127,14 @@ Open questions (each needs one in-game check by Unholy):
 | Item details | Item `DescId` is `desc_itm_common` (empty) on every item, so the Bag shows table data: gear stats per grade (as above), consumable effects `effParam0..2` {val, Time, effDescId} -> `GDSItemEffDescData`.DescId -> `GDSItemText` with `<ITEM_EFF_VAL>`/`<ITEM_EFF_TIME>` (ics01000590 "Heal +300 HP"), skill text from `GDSSkillData`. | Verified (data) |
 | Item prices | `priceInfo.priceSellRichList` / `priceBuyRichList` are 5-entry lists; gear indexes by grade-1 (ilt02000020 sell [550,920,1480,0,0]), other items use entry 0 (ics01000590 sell 60, buy 190). Whether quality changes the price is UNVERIFIED (check: sell a Top-quality vs Normal copy in game). | Verified (data) |
 
+## 2026-10-15 (update failsafe / rewalk)
+
+| Question | Answer | Status |
+|---|---|---|
+| Detect game update | Steam `appmanifest_2993780.acf` `buildid` + shipping exe size/mtime, stored under `%LOCALAPPDATA%\\StolenHours\\game_cache\\fingerprint.json`. | Verified (buildid 24685570 on this install) |
+| Save key after update | `resolve_key` only keeps `aes_key.hex` if it still unpacks the save; otherwise re-scans every install's shipping exe. Startup `ensure_current` rewalks when the fingerprint changed. | Verified (offline rewalk source `game:...`) |
+| Pak key / usmap | Optional fetch of FLi-FModel LATEST into `game_cache\\pak_key.hex` + `mappings.usmap`; `build-ui` prefers the cache. | Fetch path coded; LATEST match to every Steam build UNVERIFIED |
+
 ## 2026-10-15 (island build, debris, companions)
 
 | Question | Answer | Status |

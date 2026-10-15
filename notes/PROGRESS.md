@@ -329,6 +329,16 @@
 - UNVERIFIED until Unholy tries it on the Deck: real Proton run, Game Mode window, controller in the flatpak
   browser, game-running check. Live features (mod) not set up for Proton.
 
+## Update failsafe: rewalk (2026-10-15)
+- Unholy's ask: after a game update the editor must re-find the install and repopulate itself.
+- New `rewalk.py`: fingerprints Steam `buildid` + shipping exe; on change (or Records > Rewalk game /
+  `stolenhours rewalk`) re-discovers Steam/game/saves, re-scans the save AES key from the binary (stale
+  `aes_key.hex` no longer blocks), optionally pulls FLi-FModel LATEST pak key + usmap into
+  `%LOCALAPPDATA%\\StolenHours\\game_cache`, optional `--rebuild` for build-ui on the project PC.
+- Startup: `ensure_assets` calls `ensure_current`. CLI: `rewalk` / `rewalk --status`. Tests: 4 pass.
+- Portable exe: save key always recoverable from the game. Bundled UI tables still need a project rebuild to
+  refresh after a content patch; cache still holds fresh pak/usmap for that.
+
 ## Island tab: debris, terrain, buddies (2026-10-15)
 - Unholy's ask: all three maps (personal / past / big), clear debris for building, figure out terraforming,
   full companion list to edit in/out. Don't report until it's in the tool.
