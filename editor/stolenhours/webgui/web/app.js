@@ -195,15 +195,18 @@ function bindViewToggle() {
   $$("[data-v3]").forEach((b) => (b.onclick = () => { localStorage.setItem(VIEW3D_KEY, b.dataset.v3); render(); }));
 }
 // Appearance and held items come from the editor's copy of the save, so unsaved edits show up. Armour is the main
-// character's (live hook, else its last reading, else the save) unless opts.gear says otherwise.
+// character's (live hook, else its last reading, else the save) unless opts.gear is set ({} = bare creation outfit).
 async function stage3d(box, opts = {}, fallback = render) {
-  const [look, held, gear] = await Promise.all([attempt(() => api("appearance")), attempt(() => api("held_items")),
-    opts.gear ? opts.gear : attempt(() => api("main_gear"))]);
+  const [look, held, gear] = await Promise.all([
+    attempt(() => api("appearance")),
+    ("held" in opts) ? Promise.resolve(opts.held) : attempt(() => api("held_items")),
+    ("gear" in opts) ? Promise.resolve(opts.gear) : attempt(() => api("main_gear")),
+  ]);
   if (!look || !box.isConnected) return;
   S.look = look;
   box.classList.add("is3d");
   const fail = (e) => { if (e) console.error(e); S.no3d = true; fallback(); };
-  window.Look3D.show(box, look, { lives: S.sum.lives, life: S.sum.life, held: held || {}, ...opts, gear })
+  window.Look3D.show(box, look, { lives: S.sum.lives, life: S.sum.life, held: held || {}, ...opts, gear: gear || {} })
     .then((ok) => ok || fail()).catch(fail);
 }
 
@@ -631,6 +634,8 @@ const LOOK_SLIDERS = {
 };
 const LOOK_GROUPS = [["Body", ["BodyModelId", "BodyId", "VoiceId"]], ["Face", ["HeadModelId", "FaceColorId", "OptionPartsId", "EarPartsId"]],
   ["Hair", ["HairModelId", "HairColorId"]], ["Eyes", ["EyePartsId", "EyeColorId", "EyeBrowPartsId"]], ["Nose & Mouth", ["NosePartsId", "MouthPartsId"]]];
+// Same idea as the in-game create-a-character screen: head tabs pull the camera in.
+const LOOK_FACE_FIELDS = new Set(LOOK_GROUPS.filter(([g]) => g !== "Body").flatMap(([, fs]) => fs));
 
 async function lookCatalog() {
   if (!S.lookCat) S.lookCat = await fetch("game/avatar/catalog.json").then((r) => r.json()).catch(() => ({ fields: [] }));
@@ -642,6 +647,7 @@ async function vAppearance() {
   if (!app) return;
   S.look = app;
   S.lookField = S.lookField || "HairModelId";
+  if (S.lookBare == null) S.lookBare = true; // Look tab defaults to the creation outfit
   drawLook();
 }
 
@@ -677,6 +683,10 @@ function drawLook() {
     <div class="panel scroll look-card"><div class="pad">
       <div class="band"><span>Your character</span></div>
       <div id="look-preview" class="look-preview"></div>
+      <div class="row look-sub" style="margin-top:8px">
+        <label class="check" title="Bare body like the create-a-character screen: no armor, no held gear, creation idle">
+          <input type="checkbox" id="look-bare" ${S.lookBare ? "checked" : ""}> Creation outfit</label>
+      </div>
       <div class="pick-list">${summary}</div>
     </div></div>
     <div class="panel look-main"><div class="pad">
@@ -703,6 +713,11 @@ function drawLook() {
 
   $$("[data-field]").forEach((t) => (t.onclick = () => { S.lookField = t.dataset.field; drawLook(); }));
   if ($("#look-all")) $("#look-all").onchange = (e) => { S.lookAll = e.target.checked; drawLook(); };
+  if ($("#look-bare")) $("#look-bare").onchange = (e) => {
+    S.lookBare = e.target.checked;
+    if (S.lookBare) S.lookPose = "menu";
+    drawLook();
+  };
   $$("[data-opt]").forEach((d) => (d.onclick = () => setLook({ [field.field]: d.dataset.opt })));
   $$("[data-slider]").forEach((r) => {
     r.oninput = () => ($("#sv-" + r.dataset.slider).textContent = r.value);
@@ -724,7 +739,14 @@ function drawLookPreview() {
   const box = $("#look-preview");
   if (!box) return;
   if (window.Look3D && !S.no3d) {
-    stage3d(box, { pose: S.lookPose ?? S.sum.life, onPose: (p) => (S.lookPose = p) }, drawLookPreview);
+    const faceClose = LOOK_FACE_FIELDS.has(S.lookField);
+    const opts = {
+      pose: S.lookBare ? "menu" : (S.lookPose ?? "menu"),
+      faceClose,
+      onPose: (p) => { S.lookPose = p; },
+    };
+    if (S.lookBare) { opts.gear = {}; opts.held = {}; opts.bar = true; }
+    stage3d(box, opts, drawLookPreview);
     return;
   }
   box.classList.remove("is3d");

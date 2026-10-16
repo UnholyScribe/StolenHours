@@ -269,6 +269,8 @@ const _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Qua
 // rented starter gear. The other poses are empty-handed, as on the Characters screen.
 function heldFiles(key) {
   if (!key?.startsWith("life")) return [];
+  // Empty gear {} = creation outfit: never fall back to rental starter tools.
+  if (gearSrc && gearSrc !== "defaults" && !gearSrc.models && !gearSrc.items) return [];
   const ids = held[key]?.length ? held[key] : manifest.rental?.[key] || [];
   return ids.map((i) => manifest.items?.[i]).filter(Boolean);
 }
@@ -374,6 +376,9 @@ async function show(container, look, opts = {}) {
   if (opts.bar === false) { if (poseKey === null) poseKey = "menu"; } else poseBar(opts.barHost || container, opts.lives, opts.life);
   lastLook = look;
   await rebuild();
+  // Character-creation style: face tabs pull in close; body/full stays framed.
+  if (opts.faceClose != null) faceView(!!opts.faceClose);
+  else if (!closeUp) frame();
   return true;
 }
 
