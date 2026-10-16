@@ -329,6 +329,14 @@
 - UNVERIFIED until Unholy tries it on the Deck: real Proton run, Game Mode window, controller in the flatpak
   browser, game-running check. Live features (mod) not set up for Proton.
 
+## Deck-synced save: buddies + houses (2026-10-15)
+- Unholy synced the Steam Deck save. Probe: Kunugi + Duglas in `m_stFriendP` (handles 0x11000/0x11001),
+  both in the party; Kunugi living on Base Camp. Three houses in `exParamHouse` (yours, guild, Kunugi's).
+  Debris flags cleared for reclaim_01, guild, myhouse, and Depths B1 reclaim 00/01.
+- Companions: friend handle base fixed to `0x11000`; add fills HP/SP/lifeStatus and seats party; remove clears
+  party + island friend rows. Island tab lists houses. `rewalk --force --rebuild` refreshed UI tables (~246 s).
+- UNVERIFIED: add a third buddy in the editor and load in game; gear handles for new buddies.
+
 ## Update failsafe: rewalk (2026-10-15)
 - Unholy's ask: after a game update the editor must re-find the install and repopulate itself.
 - New `rewalk.py`: fingerprints Steam `buildid` + shipping exe; on change (or Records > Rewalk game /

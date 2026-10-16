@@ -204,6 +204,20 @@ class Island:
                     if isinstance(val, dict):
                         huge.append({"id": key, "rank": val.get("nowAreaRank", 0),
                                      "release": val.get("releaseAreaRank", 0), "points": val.get("AreaPoint", 0)})
+        houses = []
+        for h in sf.sd["m_CraftStatus"]["CraftExParamP"].get("exParamHouse") or []:
+            hid = (h.get("houseDataId") or {})
+            name = hid.get("Name") if isinstance(hid, dict) else hid
+            if name in (None, "None", ""):
+                continue
+            houses.append({
+                "id": name,
+                "map": h.get("placedMapId"),
+                "entrance": h.get("entranceMapId"),
+                "category": int(h.get("houseCategory") or 0),
+                "planned": bool(h.get("isPlannedConstruct")),
+                "rooms": len(h.get("indoorAreaStHdlArray") or []),
+            })
         return {
             "maps": self.maps,
             "groups": by_group,
@@ -213,6 +227,7 @@ class Island:
             "obstacleReleaseNum": sf.sd["m_PlayData"]["playCountData"]["obstacleReleaseNum"],
             "terrain": terra,
             "huge": huge,
+            "houses": houses,
         }
 
     def terrain_summary(self, sf: SaveFile) -> dict:

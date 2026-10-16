@@ -48,6 +48,7 @@ def test_add_remove_friend_roundtrip(bud, loaded):
     before = len(bud.state(sf)["friends"])
     row = bud.add_friend(sf, "chr000100", friendship=100, level=5)
     assert row["name"] == "Laura" and sf.dirty
+    assert row["handle"] == companions.FRIEND_HANDLE_BASE + row["slot"]
     assert len(bud.state(sf)["friends"]) == before + 1
     with pytest.raises(savefile.SaveFileError):
         bud.add_friend(sf, "chr000100")
@@ -56,3 +57,19 @@ def test_add_remove_friend_roundtrip(bud, loaded):
     friends = sd["m_CharaStatus"]["m_stFriendP"]
     assert all(f.get("m_paramId") in (None, "None", "", 0) or f["m_paramId"] != row["param"]
                for f in friends)
+
+
+def test_synced_save_friends_if_present(bud):
+    """Deck-synced probe save carries Kunugi + Duglas when Unholy has recruited them."""
+    from pathlib import Path
+    probe = Path(__file__).resolve().parents[2] / "research" / "tmp" / "gamedata_probe.bin"
+    if not probe.exists():
+        pytest.skip("probe save missing")
+    sf = savefile.SaveFile.load(probe)
+    st = bud.state(sf)
+    if len(st["friends"]) < 2:
+        pytest.skip("probe save has no recruited buddies yet")
+    names = {f["name"] for f in st["friends"]}
+    assert {"Kunugi", "Duglas"} <= names
+    assert st["friends"][0]["handle"] == companions.FRIEND_HANDLE_BASE
+    assert any(r.get("living") for r in st["residents"])

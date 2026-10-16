@@ -25,8 +25,9 @@ DATA_PATTERN = (
     r"Activity/GDSLibraryListData|Limit/GDSFollowerLimitConfig|Friend/GDSFriendshipInfoSetting)\.uasset$"
 )
 FRIEND_SLOTS = 64
-# Avatar uses 65536; friend handles UNVERIFIED — allocate 65537+slot so they stay unique vs empty 0
-FRIEND_HANDLE_BASE = 65537
+# Avatar = 0x10000 (65536). Real friends on Unholy's Deck-synced save: Kunugi 0x11000, Duglas 0x11001.
+FRIEND_HANDLE_BASE = 0x11000  # 69632
+AVATAR_HANDLE = 0x10000
 
 
 def extract(force: bool = False) -> None:
@@ -161,19 +162,32 @@ class Companions:
                 continue
             pid = slot["m_paramId"]
             cid = pid[5:] if isinstance(pid, str) and pid.startswith("para_") else pid
+            h = (slot.get("m_charaStHdl") or {}).get("handle") or 0
             friends.append({
                 "slot": i, "id": cid, "param": pid, "name": self.name_of(cid),
                 "level": int(slot.get("m_lv") or 0), "friendship": int(slot.get("m_friendship") or 0),
-                "handle": (slot.get("m_charaStHdl") or {}).get("handle") or 0,
+                "handle": h, "talk": int(slot.get("m_talkCount") or 0),
+                "quests": int(slot.get("m_questCount") or 0),
             })
+        by_h = {f["handle"]: f for f in friends}
         party = []
         for row in sf.sd["m_PartyStatus"]["m_partyCharaInfoList"]:
             h = (row.get("m_charaStHdl") or {}).get("handle") or 0
             party.append({
                 "handle": h, "type": row.get("m_partyType", 0), "idx": row.get("m_partyIdx", 0),
                 "leader": bool(row.get("m_isLeader")),
-                "who": "You" if h == 65536 else (next((f["name"] for f in friends if f["handle"] == h), None)
-                                                 or (f"#{h}" if h else "Empty")),
+                "who": ("You" if h == AVATAR_HANDLE else
+                        (by_h[h]["name"] if h in by_h else (f"#{h}" if h else "Empty"))),
+            })
+        residents = []
+        for info in sf.sd["m_NpcStatus"].get("CraftAreaFriendNpcInfo") or []:
+            h = (info.get("CharaStatusHandle") or {}).get("handle") or 0
+            if not h:
+                continue
+            f = by_h.get(h)
+            residents.append({
+                "handle": h, "name": f["name"] if f else f"#{h}", "id": f["id"] if f else None,
+                "map": info.get("mapId"), "living": bool((info.get("CraftAreaInhabitantHandle") or {}).get("handle")),
             })
         fid = sf.sd["m_PartyStatus"]["m_followerCharaInfo"].get("m_followerId")
         if fid in (None, "None", ""):
@@ -186,6 +200,7 @@ class Companions:
             "instant": self.instant,
             "friends": friends,
             "party": party,
+            "residents": residents,
             "follower": {"id": fid, "name": self.name_of(fid) if fid else None},
             "supporter": (sf.sd["m_PartyStatus"]["m_supporterCharaInfo"].get("m_charaStatusHandle") or {}).get("handle") or 0,
             "instantHandle": (sf.sd["m_PartyStatus"]["m_instantCharaInfo"].get("m_charaStatusHandle") or {}).get("handle") or 0,
@@ -207,8 +222,13 @@ class Companions:
         sf.dirty = True
         return chara_id
 
-    def add_friend(self, sf: SaveFile, chara_id: str, friendship: int = 0, level: int = 1) -> dict:
-        """Fill the first empty friend slot. UNVERIFIED in game until a recruit is load-tested."""
+    def add_friend(self, sf: SaveFile, chara_id: str, friendship: int = 0, level: int = 1,
+                   to_party: bool = True) -> dict:
+        """Fill the first empty friend slot.
+
+        Handle layout verified on Unholy's Deck-synced save (Kunugi @ 0x11000, Duglas @ 0x11001).
+        Gear / island house / CraftAreaFriendNpc wiring still UNVERIFIED for newly added buddies.
+        """
         meta = self.all.get(chara_id)
         if not meta:
             raise SaveFileError(f"unknown buddy {chara_id}")
@@ -221,17 +241,44 @@ class Companions:
         for i, slot in enumerate(friends):
             if not _empty_friend(slot):
                 continue
+            h = FRIEND_HANDLE_BASE + i
+            hp = max(1, 100 + 20 * max(1, int(level)))
             slot["m_paramId"] = meta["param"]
-            slot["m_charaStHdl"] = {"handle": FRIEND_HANDLE_BASE + i}
+            slot["m_charaStHdl"] = {"handle": h}
             slot["m_lv"] = max(1, int(level))
             slot["m_friendship"] = max(0, min(500, int(friendship)))
-            slot["m_nowHp"] = slot.get("m_nowHp") or 1
-            slot["m_nowSp"] = slot.get("m_nowSp") or 1
+            slot["m_exp"] = slot["m_friendship"]
+            slot["m_nowHp"] = hp
+            slot["m_nowSp"] = 100
+            slot["rateMaxHp"] = hp
+            slot["rateNowHp"] = hp
+            slot["rateMaxSp"] = 100
+            slot["rateNowSp"] = 100
+            slot["m_addOrder"] = i + 1
+            slot["m_nowRecoverySPTime"] = 1.0
+            slot["m_lifeStatus"] = {"licenseRank": 1, "star": 0, "skillMaxPoint": 0}
+            slot["m_isInstantChara"] = 0
+            if to_party:
+                self._seat_in_party(sf, h)
             sf.dirty = True
             return {"slot": i, "id": chara_id, "param": meta["param"], "name": meta["name"],
-                    "level": slot["m_lv"], "friendship": slot["m_friendship"],
-                    "handle": slot["m_charaStHdl"]["handle"]}
+                    "level": slot["m_lv"], "friendship": slot["m_friendship"], "handle": h}
         raise SaveFileError("no free buddy slots (64)")
+
+    def _seat_in_party(self, sf: SaveFile, handle: int) -> None:
+        party = sf.sd["m_PartyStatus"]["m_partyCharaInfoList"]
+        used = {(p.get("m_partyIdx") if (p.get("m_charaStHdl") or {}).get("handle") else None) for p in party}
+        for idx in (1, 2, 3):
+            if idx in used:
+                continue
+            for p in party:
+                if (p.get("m_charaStHdl") or {}).get("handle"):
+                    continue
+                p["m_charaStHdl"] = {"handle": handle}
+                p["m_partyType"] = 0
+                p["m_partyIdx"] = idx
+                p["m_isLeader"] = 0
+                return
 
     def remove_friend(self, sf: SaveFile, chara_id: str | None = None, slot: int | None = None) -> int:
         friends = sf.sd["m_CharaStatus"]["m_stFriendP"]
@@ -245,6 +292,7 @@ class Companions:
                 continue
             if chara_id is not None and cid != chara_id and pid != chara_id and pid != f"para_{chara_id}":
                 continue
+            h_gone = (row.get("m_charaStHdl") or {}).get("handle") or 0
             row["m_paramId"] = "None"
             row["m_charaStHdl"] = {"handle": 0}
             row["m_lv"] = 0
@@ -252,13 +300,24 @@ class Companions:
             row["m_exp"] = 0
             row["m_nowHp"] = 0
             row["m_nowSp"] = 0
-            # drop from party if referenced
-            h_gone = FRIEND_HANDLE_BASE + i
+            row["rateMaxHp"] = 0
+            row["rateNowHp"] = 0
+            row["rateMaxSp"] = 0
+            row["rateNowSp"] = 0
+            row["m_addOrder"] = 0
             for p in sf.sd["m_PartyStatus"]["m_partyCharaInfoList"]:
                 if (p.get("m_charaStHdl") or {}).get("handle") == h_gone:
                     p["m_charaStHdl"] = {"handle": 0}
                     p["m_partyIdx"] = 4
                     p["m_isLeader"] = 0
+            # clear island friend-npc row that pointed at this handle
+            for info in sf.sd["m_NpcStatus"].get("CraftAreaFriendNpcInfo") or []:
+                if (info.get("CharaStatusHandle") or {}).get("handle") == h_gone:
+                    info["CharaStatusHandle"] = {"handle": 0}
+                    info["CraftAreaInhabitantHandle"] = {"handle": 0}
+            for info in sf.sd["m_NpcStatus"].get("CraftAreaInhabitantInfo") or []:
+                if (info.get("CharaStatusHandle") or {}).get("handle") == h_gone:
+                    info["CharaStatusHandle"] = {"handle": 0}
             n += 1
             if slot is not None or chara_id is not None:
                 break

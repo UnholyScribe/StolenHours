@@ -1358,6 +1358,8 @@ function islDebris() {
       (area ranks below). Live Map already shows all three.</div>
     <div class="it-stat"><span>Debris cleared</span><b>${isl.cleared} / ${isl.cleared + isl.remaining}</b></div>
     <div class="it-stat"><span>obstacleReleaseNum</span><b>${fmt(isl.obstacleReleaseNum)}</b></div>
+    ${(isl.houses || []).length ? `<div class="band" style="margin-top:14px"><span>Houses</span></div>
+      ${isl.houses.map((hh) => `<div class="it-stat"><span>${h(hh.id)}</span><b>${h(hh.map || "?")}${hh.rooms ? ` · ${hh.rooms} room(s)` : ""}</b></div>`).join("")}` : ""}
     <div class="band" style="margin-top:14px"><span>Ginormosia areas</span></div>
     ${(isl.huge || []).map((a) => `<div class="it-stat"><span>${h(a.id)}</span><b>rank ${a.rank} · ${fmt(a.points)} pts</b></div>`).join("") ||
       `<div class="muted">No area data.</div>`}
@@ -1409,9 +1411,11 @@ function islBuddies() {
     </div>
     <div class="band"><span>In your save</span></div>
     <div class="ev-live">${(b.friends || []).length ? b.friends.map((f) => `
-      <div class="ev-live-row"><span>${h(f.name)}<small>Lv ${f.level} · friendship ${f.friendship} · ${h(f.id)}</small></span>
+      <div class="ev-live-row"><span>${h(f.name)}<small>Lv ${f.level} · friendship ${f.friendship}${f.talk != null ? ` · talked ${f.talk}` : ""} · ${h(f.id)}</small></span>
         <button class="ev-x" data-budrm="${h(f.id)}" title="Remove">✕</button></div>`).join("")
       : `<div class="muted" style="padding:8px 2px">No buddies in the friend roster yet.</div>`}</div>
+    ${(b.residents || []).length ? `<div class="band" style="margin-top:10px"><span>On the island</span></div>
+      <div class="muted">${b.residents.map((r) => `${h(r.name)}${r.living ? " (living)" : ""}`).join(" · ")}</div>` : ""}
     <div class="band" style="margin-top:12px"><span>All buddies</span></div>
     <div id="col-list" class="col-list">${catalog.map((c) => `
       <div class="col-row ${have.has(c.id) ? "on" : ""}">
