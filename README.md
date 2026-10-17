@@ -55,6 +55,11 @@ small mod for you (from either tab) once UE4SS is there. Everything else works o
 Still, keep your own copy of your save. Use it offline and at your own risk; don't take edited saves into multiplayer.
 
 
+
+## Community
+
+Questions, bug reports and feedback: [Reveria Guild Hall on Discord](https://discord.gg/YvAJJ9kpzu).
+
 ## Credits
 
 - Built by Unholy with his friend Tock, his AI coding partner.
