@@ -1,0 +1,44 @@
+Stolen Hours on a Steam Deck
+============================
+
+The editor runs through Proton and shows up full screen in Game Mode. The Deck's controls, or any Xbox or
+PlayStation controller, drive it.
+
+One-time setup (Desktop Mode)
+1. Copy the whole "Stolen Hours" folder to the Deck, for example to /home/deck/Applications/Stolen Hours.
+2. Open Discover and install Google Chrome or Microsoft Edge (Firefox works too). The editor's screens open in it.
+3. In Steam, make sure a Proton is installed: Library, search "Proton", install Proton Experimental if none is there.
+4. In the Stolen Hours folder, right-click StolenHours-Deck.sh, Properties, Permissions, tick "Is executable".
+5. Steam: Games > Add a Non-Steam Game to My Library > Browse > pick StolenHours-Deck.sh > Add Selected Programs.
+   Don't force a Proton version on this entry; the script is a Linux program and starts Proton itself.
+6. Back to Game Mode. Stolen Hours is in your Library under Non-Steam.
+
+The first start sets up a small Proton folder for the editor and can take a minute.
+
+Controls
+  D-pad / left stick ........ move between buttons, tiles and fields
+  A (Cross) ................. press, open a list, start typing in a field
+  B (Circle) ................ back, close a list or message
+  LB / RB (L1 / R1) ......... previous / next screen
+  LT / RT (L2 / R2) ......... page up / down
+  Right stick ............... scroll
+  Y (Triangle) .............. pointer for the maps and the skill board: left stick moves it, hold A to drag,
+                              right stick zooms, B leaves
+  Start (Options) ........... jump to "Save to file"
+  View (Share / Create) ..... jump to the screen list
+  Steam + X ................. on-screen keyboard while a text field is active
+A keyboard works the same way: arrows, Enter, Escape.
+
+If the buttons do nothing, open the controller settings for the Stolen Hours entry and pick the "Gamepad" layout.
+
+Safety
+- Close the game before "Save to file". The editor checks the Deck's running programs and refuses while the game
+  is up.
+- Each save keeps a backup with a SHA-256 in
+  /home/deck/.local/share/StolenHours/compat/pfx/drive_c/users/steamuser/AppData/Local/StolenHours/backups
+
+Not on the Deck yet
+- The live features (Time Hook, live reads on the Live Map) need the Stolen Hours mod inside the running game.
+  That isn't set up for Proton.
+
+If something goes wrong, the log is /home/deck/.local/share/StolenHours/deck.log

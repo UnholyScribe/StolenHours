@@ -1,0 +1,24 @@
+research/private/
+backups/
+*.bin
+*.dll
+*.exe
+*.pdb
+*.sav
+__pycache__/
+.pytest_cache/
+.venv/
+build/
+tools/fli_save_editor/
+tools/ue4ss/
+# Art and fonts extracted from the game: local only, rebuilt by tools/build_ui_assets.py
+assets/
+editor/stolenhours/webgui/web/game/
+tools/asset_extract/bin/
+tools/asset_extract/obj/
+# Discord bot: token and member XP stay local
+discord_bot/.env
+discord_bot/data/
+
+# Optional local BGM (not redistributed)
+editor/stolenhours/webgui/web/music/*.ogg

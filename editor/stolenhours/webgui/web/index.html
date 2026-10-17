@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stolen Hours</title>
+<link rel="icon" href="game/coin.png">
+<link rel="stylesheet" href="style.css?v={{v}}">
+</head>
+<body>
+<div id="wall"></div>
+
+<!-- title screen -->
+<section id="title-screen">
+  <div class="logo">
+    <div class="logo-small">Fantasy Life <i>i</i></div>
+    <div class="logo-big">Stolen Hours</div>
+    <div class="logo-sub">save editor &amp; time hook</div>
+  </div>
+  <div class="title-card panel">
+    <div class="band"><span>Choose your adventure</span></div>
+    <label class="field-label" for="save-select">Save file</label>
+    <select id="save-select"></select>
+    <div class="title-actions">
+      <button class="btn btn-green" id="start-btn">Start</button>
+      <button class="btn btn-cream" type="button" data-music-toggle>Music on</button>
+    </div>
+    <div class="title-note" id="title-note"></div>
+  </div>
+</section>
+
+<!-- main menu -->
+<section id="menu" hidden>
+  <div id="board">
+    <header id="topbar">
+      <div class="screen-tab"><img class="ico" id="screen-icon" alt=""><span id="screen-title">Adventurer</span></div>
+      <div class="topbar-right">
+        <button class="btn btn-cream btn-small music-chip" type="button" data-music-toggle>Music on</button>
+        <div class="chip" id="mode-chip">Mode A</div>
+        <div class="dosh-pill" title="Dosh in the loaded save"><img src="game/coin.png" alt=""><span id="top-dosh">0</span></div>
+      </div>
+    </header>
+
+    <nav id="nav">
+      <button data-view="overview"><img src="game/nav_overview.png" alt=""><span>Adventurer</span></button>
+      <button data-view="lives"><img src="game/nav_lives.png" alt=""><span>Licenses</span></button>
+      <button data-view="inventory"><img src="game/nav_inventory.png" alt=""><span>Bag</span></button>
+      <button data-view="appearance"><img src="game/nav_appearance.png" alt=""><span>Look</span></button>
+      <button data-view="map"><img src="game/nav_map.png" alt=""><span>Map</span></button>
+      <button data-view="livemap"><img src="game/nav_livemap.png" alt=""><span>Live Map</span></button>
+      <button data-view="island"><img src="game/nav_island.png" alt=""><span>Island</span></button>
+      <button data-view="live"><img src="game/nav_live.png" alt=""><span>Time Hook</span></button>
+      <button data-view="collection"><img src="game/nav_collection.png" alt=""><span>Collection</span></button>
+      <button data-view="forge"><img src="game/nav_forge.png" alt=""><span>Vulcan</span></button>
+      <button data-view="file"><img src="game/nav_file.png" alt=""><span>Records</span></button>
+      <button data-view="backups"><img src="game/nav_backups.png" alt=""><span>Backups</span></button>
+    </nav>
+
+    <main id="view"></main>
+
+    <footer id="hintbar">
+      <div class="hint" id="status-text">Ready.</div>
+      <div class="hint-actions">
+        <button class="btn btn-cream" id="revert-btn">Revert</button>
+        <button class="btn btn-green" id="save-btn">Save to file</button>
+      </div>
+    </footer>
+  </div>
+</section>
+
+<!-- dialog -->
+<div id="dialog-veil" hidden>
+  <div class="dialog panel">
+    <img class="dialog-badge" src="game/alert.png" alt="">
+    <div class="band"><span id="dialog-title">Notice</span></div>
+    <div class="dialog-body" id="dialog-body"></div>
+    <div class="dialog-actions" id="dialog-actions"></div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+<div id="busy" hidden><div class="spinner"></div><div id="busy-text">Working...</div></div>
+
+<script type="importmap">{"imports": {"three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/"}}</script>
+<script src="music.js?v={{v}}"></script>
+<script src="app.js?v={{v}}"></script>
+<script src="pad.js?v={{v}}"></script>
+<script type="module" src="look3d.js?v={{v}}"></script>
+<script type="module" src="village3d.js?v={{v}}"></script>
+</body>
+</html>

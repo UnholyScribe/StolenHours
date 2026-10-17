@@ -56,6 +56,29 @@ Still, keep your own copy of your save. Use it offline and at your own risk; don
 
 
 
+## Source
+
+This repo includes the editor and Time Hook mod source.
+
+| Path | What |
+|---|---|
+| `editor/` | Python package (save codec, CLI, web GUI, tests) |
+| `hook/` | UE4SS Lua mod + `install_live.ps1` |
+| `docs/` | Blueprint, verified findings, rebuild notes |
+| `tools/` | Asset extractor source + third-party fetch notes |
+
+**Run from source (Windows):**
+
+1. Python 3.12: `py -3.12 -m pip install -r editor\requirements.txt pywebview`
+2. Optional UI art from the game paks: install the game, fetch tools listed in `tools\README.md`, then  
+   `cd editor` → `py -3.12 -m stolenhours build-ui` (writes `editor\stolenhours\webgui\web\game\`, gitignored).
+3. Save key: the shipped exe pulls it from the game binary. For the Python tree, either run once with the game
+   installed (`container.resolve_key`) or put `research\private\aes_key.hex` (gitignored; never commit keys).
+4. `StolenHours.cmd` or `cd editor` → `py -3.12 -m stolenhours`
+5. Tests: `cd editor` → `py -3.12 -m pytest -q tests`
+
+Game art/fonts under `web\game\` and keys under `research\private\` are **not** in this repo on purpose.
+
 ## Community
 
 Questions, bug reports and feedback: [Reveria Guild Hall on Discord](https://discord.gg/YvAJJ9kpzu).
