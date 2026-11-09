@@ -1,5 +1,109 @@
 # Progress
 
+## 2026-11-09: PetDesigner lessons + brother-ready ship (Tock)
+- Read `G:\Archives\petdesigner-book` (NMS techniques). Wrote `research/refs/petdesigner-lessons.md`.
+- Adopted: no-store for JS/JSON/manifests (server + fetches); Look already correct for FLi bone scale
+  (bind inverses — do **not** copy NMS scale override). Ship `START HERE.txt`.
+- Portable story for handoff: double-click EXE, auto Steam/save/key, WebView2 prompt or browser fallback,
+  silent MOTW clear, Live Map one-click. Rebuild + zip after this note.
+
+## 2026-11-09: EXE Just Works + Live Map setup (Tock)
+- Testers still needed Unblock-File / a command, couldn't find saves, Live Map dead.
+- Root causes: GitHub release still 0.3.0; MOTW; soft-deps MessageBox that exited on Yes;
+  title "Other file" used prompt() instead of native picker; Live Map needs UE4SS which we never installed.
+- Fixes in 0.5.0: silent MOTW clear every launch; only hard blockers prompt; deeper userdata scan;
+  native Open dialog (webview or Win32); clearer key/save errors; ship `tools/ue4ss/dist` and
+  **Install Live setup** (UE4SS + StolenHours mod + EAC skip) from the Live Map pane.
+
+## 2026-10-26: GitHub MOTW unblock (Tock)
+- Tester (Khilents): crash after GitHub zip until `Unblock-File`; had to redo every reopen; Live Map
+  idle without the game (expected — clarified in UI veil).
+- New `stolenhours.motw`: detect Zone.Identifier, prompt once, silent unblock on later launches.
+- Ship `Run Stolen Hours.cmd` next to the exe (unblock + start). Crash dialog mentions it.
+- README: "just unzipped and it crashes" → Run Stolen Hours.cmd.
+
+## 2026-10-22: Portable deps + Luby crash fix (Tock)
+- Luby's `editor_crash.log`: pythonnet / `Python.Runtime.dll` failed on WinForms UI — no browser fallback.
+- Native UI now prefers **Edge WebView2** (`edgechromium`); skips WinForms unless .NET 4.8 is present;
+  any native failure opens the system browser with a clear message.
+- New `stolenhours.deps`: WebView2 / .NET 4.8 / browser / game+save checklist, writes
+  `%LOCALAPPDATA%\StolenHours\setup_check.txt`, MessageBox with install link or continue.
+- Flags: `--check`, `--browser`. Crash dialog hints WebView2 / `--browser` for pythonnet errors.
+- Goal for next GitHub zip: zero ties to Unholy's PC; stranger PCs get told what's missing.
+
+## 2026-10-17: Village blank blue sky fix (Tock)
+- Outdoor Village showed only clear-color sky: custom water `ShaderMaterial` (Three r186) could
+  abort craft-sector build after the scene was cleared. Reverted water to `MeshStandardMaterial`,
+  try/catch around craft mesh, clear `craftTexCache` on hardReset. Exe rebuilt.
+
+## 2026-10-17: Single exe + cleanup (Tock)
+- Rebuilt `G:\Stolen Hours\StolenHours.exe` (includes Village water/lighting stand-in pass).
+- Removed duplicate source `G:\StolenHours-repo`, old `StolenHours-0.{1,2,3}.0-win64.zip` on G:\,
+  leftover `build/` under the project. Kept: source `E:\Fantasy Life i - Stolen Hours` + one exe folder.
+
+## 2026-10-17: Customization look — honest limit + stand-in pass (Tock)
+- Unholy asked for foliage/grass/rubble/cliff/water/lighting **100% identical** to Customization.
+- **Cannot** — Village is Three, not the game’s UE materials/foliage. Documented in FINDINGS.
+- What we did improve: softer outdoor lighting, animated stylized water ripples, denser grass
+  tufts + cliff grooves, keep map3d surroundings + save craft (ruins/rubble when placed).
+- Reload Village to see; no exe rebuild required for web assets if running from source.
+
+## 2026-10-17: Wipe useless UE orbit data (Tock)
+- Deleted all 448 survey PNGs (~700 MB) + UE `Saved/Logs`, `Intermediate`, `E:\SMW` junction.
+- Re-exported math-only truth: `grid.json`, `objects.json`, `import_manifest.json`, per-cell `meta.json`.
+- **UE role (decision):** blank UE 5.8 cannot close schematic↔Customization — no FLi cooked map/craft
+  content. Keep `survey_math` (Python). Park orbit capture until/unless we import real glTF into UE for
+  debug; finishing Village stays Three.js + save/live + extracted meshes. Game’s own UE (UE4SS live) is
+  already the useful runtime path.
+
+## 2026-10-17: UE Math Worker survey (Tock)
+- `tools/SurveyMathWorker/` scaffold remains (Cmd + Python import/capture) but orbit PNGs abandoned as empty.
+- `stolenhours.survey_math` / `stolenhours survey export` writes truth tables (no UE required).
+- Village pane loads `survey_truth` API: yellow cell rings + green door-forward arrows.
+
+## 2026-10-17: Village outdoor 90° axis lock (Tock)
+- Matched shots: guild/mountain are **north** in Customization but were **west** in the editor (full 90° off).
+- Outdoor map is now `X=−UE_Y`, `Z=UE_X`; map3d `rotation.y = −90°`; default cam looks north. Rebuilt exe.
+
+## 2026-10-17: Village outdoor N/S axis fix (Tock)
+- Matched-angle shots showed houses/water/hills mirrored N/S vs Customization (looking west: houses should be right/north).
+- Outdoor Three Z is now `+UE_Y` (was `−UE_Y`); map3d no longer Z-mirrors. Rebuilt `G:\Stolen Hours\StolenHours.exe`.
+
+## 2026-10-17: Village view vs Customization fix (Tock)
+- Editor was a bare craft heightfield in the sky; in-game Customization has map3d surroundings + overhead diamond cam.
+- Re-enabled Base Camp `map3d` env by default; Customization-like 45° high cam; brighter yellow pad rim; larger N/E/S/W.
+- Rebuilt `G:\Stolen Hours\StolenHours.exe` (close/reopen editor, hit Reload).
+
+## 2026-10-17: Source published to GitHub (Tock)
+- Pushed editor + hook + docs + research helpers to https://github.com/UnholyScribe/StolenHours (`49c8669`).
+- Scrubbed Steam id / personal paths; kept keys, `web/game` art, and game BGM oggs out of the repo.
+- README now has a **Source** section (run-from-source steps).
+
+## 2026-10-17: Village map hard refresh + N/E/S/W (Tock)
+- Reload now hard-resets Village3D (meshes/caches/static map3d env) and re-fetches terrain + placements from the open save.
+- Outdoor craft rebuilds from save heightfield only (`loadEnv` off by default).
+- Compass: world N/E/S/W sprites + HUD rose (N = −Z, E = +X, S = +Z, W = −X).
+
+## 2026-10-17: NH Discord showcase posts (Tock)
+- Posted Stolen Hours showcase (Reddit + GitHub + Look/Live Map image links; **no** invite) in Nintendo Homebrew `#off-topic` and `#nintendo-discussion` (staff-cleared).
+- Reveria invite already on Reddit post + GitHub README Community section.
+
+## 2026-10-17: Exe rebuild + Reddit check (Tock)
+- Rebuilt `G:\Stolen Hours\StolenHours.exe` (0.4.0, village live + presets). Portable check: no leaks/missing. Mod in game **0.7.0** `current: true`. Village tests 5/5.
+- Reddit u/TheHourThief: live post `1x7wmw7` still up (score 1); no DMs, no replies on the post or to the outreach comments. Inbox only old AutoMod on deleted `1x4ld1z`.
+
+## 2026-10-16: Exe 0.4.0 + Reddit skim (Tock)
+- UE4SS StolenHours mod force-reinstalled; game has **0.7.0**, hashes match repo (`current: true`).
+- `__version__` → **0.4.0**; rebuilt `G:\Stolen Hours\StolenHours.exe` (bundles mod 0.7.0). GitHub release still
+  v0.3.0 (not pushed). Selftest roundtrip OK.
+- Reddit (u/TheHourThief): promo post still AutoMod-removed (“account too new”, 3 days ago); no modmail reply.
+  Recent r/fantasylife: gameplay / DLC-save path help / islander recipes — no rival FLi save editor.
+- Reveria Guild Hall invite (never-expire #welcome): `https://discord.gg/YvAJJ9kpzu`. Subreddit Discord:
+  `https://discord.gg/ZAyEZ3W` (FantasyLife). Newer FLi community Discord: `https://discord.gg/fantasy-life-898413081070272542`.
+- Outreach hold (rules check 2026-10-16): Fantasy Life `#rules-and-info` has **No Spam** (and no explicit save-editor
+  ban). Dropping Reveria invites there = spam/recruiting → skip. r/fantasylife has **No blatant advertising**; promo
+  post still AutoMod-removed. No invites sent.
+
 ## 2026-10-11: Project set up (by Watchtower)
 - Folder, agent rule (Tock), README, blueprint, findings, workspace file created.
 - Save backed up to `backups\saves\2026-10-11_initial\` with SHA-256.
@@ -359,6 +463,98 @@
 - UI: Island nav tab with Debris / Terrain / Buddies. Tests: 6 new (island + companions) pass.
 - UNVERIFIED in game: clear a reclaim pile and load; reset Shave; add a buddy and load.
 
+## Dashboard music (2026-10-15)
+- Unholy's two *Last Chance Haven* loops converted to OGG under `web/music/`, listed in `playlist.json`.
+  `music.js` cycles the list on end; Music on/off on the title screen and top bar (mute remembered).
+  Add more tracks by dropping files in `web/music/` and appending to `playlist.json`.
+
+## Village live editor (2026-10-15)
+- Unholy's ask: edit the village like the guild build / decorate menus offline — map + live house view, place
+  furniture and houses, in-game graphics, Legal/Free placement toggle.
+- New `village.py` + `craft3d.py` + `village3d.js` (build-ui → `game/village/craft.json`, `game/craft3d/`).
+  Catalog 1581 craft objects / 114 houses. Place/move/rotate/remove furniture; Legal consumes `invCraft`, Free
+  ignores bag. Base Camp 2D footprints on Live Map art; My House 3D decorate (glb when extracted, else Size box).
+  House place writes shell + `exParamHouse` (MyHouse room clone still UNVERIFIED — shell-only for forceMap houses).
+- Island tabs: Debris / Terrain / Village / House / Buddies. API: `village`, `village_catalog`, `village_edit`.
+- Tests: 5 village tests pass (grid roundtrip, state, free place/move/remove outdoors + indoors).
+- UNVERIFIED in game: place furniture Legal + Free and load; move a house; new house shell with empty indoor list.
+
+## Village / House UX pass (2026-10-15, later)
+- Client loads full `game/village/craft.json` (English names). Village: pan + scroll zoom on Base Camp map;
+  Build / House kits / Placed tabs; houses-on-island list. House: opaque room 3D, full orbit + zoom + pan,
+  Furniture / Placed / Houses tabs (catalog was empty because API capped at bridges). Legal/Free kept.
+- Boyle/Cooke research → FINDINGS (resident admin vs infrastructure kit shop). Kit-buy / plot UI still next.
+- Cameras: Unholy asked zoom + 360° for house/village placement — on the list and wired for House 3D + Village map.
+
+## Float-above Craft Mode (2026-10-15, evening)
+- Unholy's refs: in-game Customization (Hagram float) + My House decorate + cyan footprint grid.
+- Village tab is now outdoor Craft Mode: Base Camp map texture as terrain, orbit/zoom/pan above the craft pad,
+  stylized thatched huts (wrong terrain glTF for houses skipped), cyan place cursor, Customization/Ground tabs.
+- House: cutaway room (herringbone floor, wallpaper, open front), grid place, furniture by corrected indoor
+  `gridIdx` (ix-major — earlier FINDINGS iy-major was wrong). Iterated in-browser against refs.
+- Floor pass (2026-10-16): honey herringbone planks (not tile/checker); visual room is (N−1)×(N−1) so Wooden
+  Bucket at grid (0,10) sits flush in the back-left corner like Screenshot 220942. Exe rebuilt.
+- Craft glTF export names materials but leaves PBR empty; sibling Mat/*.json + Tex/*_dif.png are the real
+  maps (same gap Look solved). craft3d.build packs WebP diffs into `game/craft3d/t/` + `_materials`,
+  village3d binds them (MeshBasic — baked toon). Tropical Bed (`cft130001`) + Wooden Bucket (`cft000d0d`)
+  on My House. Bulk ObjBP + Map child BP dump → ~1156 craft objects with meshes / 665 materials.
+- My House shell (2026-10-16): no south doorway notch — continuous wood sill + exterior threshold decal
+  (decorate mode). Wallpaper: ClampToEdge V, repeat.y=1, ~11/16 U slats; floor herringbone repeat ×0.25.
+  Furniture drag: recursive raycast (outermost handle), OrbitControls gated in capture phase, Y=0 snap.
+  Thick wall fill + inward wallpaper planes; cursor/drag clamped to floor cells.
+- Village outdoor (2026-10-16): UE→Three `Z = −Y/100` (−Z north, +Z south); yaw `−saveYaw` (doors south after
+  the Z flip). Removed soft X-marks; guild square is a flat decal; structures ray-snap to terrain; craft rim
+  is an elevated LineLoop with polygonOffset (no filled craft-pad plane).
+- Outdoor house yaw (2026-10-16): craft glTF doors sit on local **+X** (not +Z). Outdoor Three yaw is
+  `−90° − saveYaw` so saveYaw 0 faces south (+Z); Thatched 90 faces west toward the guild; islander 180
+  faces north. Stub hut door moved to +X to match.
+- Base Camp env extract (2026-10-16): `asset_extract world` mode (CUE4Parse `WorldExporter` → USD) on
+  `Map_000100` + mod/obj/env; `mesh` export of `mdl_map000100_*` → glTF. `map3d.py` packs 58 island
+  chunks into `web/game/map3d/`; Village outdoor loads them (Z-mirrored to match craft `Z=−Y`) under the
+  craft heightfield. `Map_000100_env` alone is mostly sky — real land is world-baked map meshes + BP
+  props in `_mod`/`_obj` (many BP instances still lack per-actor mesh refs in the USD).
+- Live Village + loadouts (2026-10-16): mod **0.7.0** adds `CRAFT_STATUS` / `CRAFT_LIST` / `CRAFT_TELEPORT`
+  (move live `CraftObjActorBase` while Customization is up — persist with in-game Save). Village UI shows
+  Live linked banner + unlock craft cam. Offline **village loadouts** in `%LOCALAPPDATA%/StolenHours/village_presets/`
+  (export/import Base Camp placeables; quit game before Apply). Ship meshes dropped from map3d pack.
+- Procedural Base Camp terrain (2026-10-16): `village.terrain_grid` packs even-cell `land_obj`/`water_obj`
+  stacks into a height field; Island → Terrain shows plateaus + 2-segment cliff bevels + cyan water plane
+  (world-space UVs on craft grass/cliff Diff textures). Raise/Lower/Level write stacked tiers via
+  `terrain_raise`/`terrain_lower`/`terrain_level` (in-game parity UNVERIFIED) and rebuild the craft sub-mesh in place.
+  Village outdoor also loads the same grid so houses snap to hills.
+- In-game house shells (2026-10-16): ObjBP thatched houses child to `BP_MJFp_Building_cft00030x` —
+  those glbs ARE the house bodies (door/bird/propeller), not bare land. Extracted cft000300–30b + guild
+  cft000b*; craft3d manifest now 1238 meshes. Village loads house glTFs with Diff bind; stylized hut is
+  fallback only. Placement cursor cyan/red by footprint tier/water check. Walk/Explore toggle (WASD
+  capsule on terrain) additive beside Build view. Room `setWallpaper`/`setFloor` APIs tagged on shell.
+- Buddies / Guild desk (2026-10-16): outdoor buddy stubs with nameplates near assigned houses; Village
+  side panel Boyle strip (island name, residents, debris jump) + Cooke kits note. Direct kit shop and
+  buddy→house assign write still next (UNVERIFIED wiring).
+- White village houses fix (2026-10-16): server served craft3d `.webp` Diff maps as `application/octet-stream`
+  (MIME unset) so WebView2 TextureLoader left MeshBasic maps blank → white shells. Registered `image/webp`.
+  Also prefer `Base_Texture`/`Diff_Texture` over RSE-stuffed `PM_Diffuse` for thatch grass mats.
+- Village is a 3D island now (2026-10-16): dropped the big static map JPG as walkable ground. Craft height
+  field + cliff skirts + ocean hull are the Base Camp; map art is a faint undersea hint only. Oblique
+  Customization camera, stronger sun shadows, grass Diff (not RSE) on plateaus. Full `Map_000100_env`
+  level mesh still not extracted (UE sublevel) — procedural craft island is the stand-in.
+- Customization ref pass (2026-10-16): Unholy’s in-game screenshots in `notes/refs/customization/`.
+  Soft 3-segment cliff lips + stratified soil tex, shore foam, cyan tile cursor + gem, occupancy X marks.
+- Static-looking island fix (2026-10-16): save already had height tiers (h=0/1/2) + 1361 water cells, but water
+  sat coplanar with grass and land→water edges skipped cliffs — read as a flat stamp. Water now recessed
+  0.42 m, land cliffs drop into canals/ocean. Brown slabs cause: house `*_grass_dif` is thatch foliage on
+  black, not ground — replaced with procedural Customization carpet (`grassCarpetTex`). Map env (beaches /
+  volcano outside yellow pad) still not extracted.
+- Free camera zoom (2026-10-16): StolenHours UE4SS 0.6.3 — F8 on/off, **F6 zoom in / F7 zoom out**
+  (Ctrl+ = big step). Craft cams use CameraLenBase (no Max) — one-shot Base write, tick never rewrites
+  Base. Survey shots in `notes/refs/customization/survey_*` = full Base Camp + yellow craft pad.
+- Pad surveys `pad_01`…`pad_05` (2026-10-16): frame Village on yellow craft AABB (not house cluster).
+  Save layout: Guild north of thatched huts matches pad_* with −Z = north.
+- Close-ups `close_01`…`close_08`: felt grass carpet, dark + cell marks, blue flower tufts, cyan gear
+  cursor (not plain octahedron).
+- Next (Mode B, after Village look): **Celestia vacuum** — sparkly island flowers (`Q` Collect Celestia /
+  “Celestia's Gift” in Customization) are goddess currency and respawn. Unholy wants live collect-all while
+  the game is rendering (track spawned pickups → one button). Offline save edit may not cover world spawns.
+
 ## Next (Unholy's order, 2026-10-12)
 0. Side-by-side: in-game map vs Live Map (icons per event kind, glow size, ripple, player arrow position and
    facing). Mod 0.5.0 is installed.
@@ -376,3 +572,4 @@
 - Unholy: compare the Life menu with `StolenHours.cmd lives` to confirm life id names.
 - Unholy: launch through Steam, load the save. Then Tock reads `ue4ss\UE4SS.log` and runs `live ping`, `live find Money`.
 - Map `m_AvatarStatus` (appearance) once the above works.
+

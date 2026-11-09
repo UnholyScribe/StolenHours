@@ -1,0 +1,18 @@
+Stolen Hours — Fantasy Life i save editor
+========================================
+
+1. Unzip this whole folder somewhere (keep StolenHours.exe next to _internal).
+2. Double-click StolenHours.exe. That is all.
+
+It finds Steam, Fantasy Life i, and your save on THIS PC by itself.
+Nothing is tied to another computer. No console commands needed.
+
+If Windows or the editor asks to install Microsoft Edge WebView2 Runtime,
+that is the built-in window. You can say yes (recommended) or continue —
+the editor will open in your normal browser instead.
+
+Live Map / live edits: close the game, open the Live Map tab, press
+"Install Live setup" once, then start the game from Steam and load a save.
+
+If something fails: run StolenHours.exe --check
+Details also go under: %LOCALAPPDATA%\StolenHours\

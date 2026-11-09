@@ -1,0 +1,971 @@
+{
+  "mapId": "Map_000100",
+  "origin_cm": [
+    -3150.0,
+    -3950.0,
+    -150.0
+  ],
+  "grid_tile_m": 10.0,
+  "placements": [
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_00",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_00.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_01",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_01.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_02",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_02.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_03",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_03.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_04",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_04.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_05",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_05.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_06",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_06.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_sea",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_sea.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_river",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_river.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_taki",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_taki.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_wave00",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_wave00.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_ff",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_ff.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_51",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_51.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_50",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_50.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_53",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_53.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_0f",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_0f.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_10",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_10.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_11",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_11.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_12",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_12.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_13",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_13.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_14",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_14.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_15",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_15.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_16",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_16.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_17",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_17.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_20",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_20.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_21",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_21.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_35",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_35.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_36",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_36.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_52",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_52.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_5a",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_5a.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_72",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_72.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_73",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_73.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_74",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_74.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_76",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_76.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_78",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_78.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_79",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_79.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_7a",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_7a.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_7b",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_7b.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_7c",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_7c.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_90",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_90.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_91",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_91.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_92",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_92.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_93",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_93.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_94",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_94.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_96",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_96.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_98",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_98.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_rock00",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_rock00.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_rock10",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_rock10.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_rock11",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_rock11.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_wall",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_wall.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "map3d",
+      "id": "mdl_map000100_wood00",
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\map3d\\m\\mdl_map000100_wood00.glb",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "note": "world-baked island chunk; may sit at origin"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_icf01020030",
+      "name": "Thatched House",
+      "handle": 1342182991,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000302_03.glb",
+      "location_cm": [
+        -100.0,
+        -900.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "cell": "D4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_icf01010021",
+      "name": "Thatched Guild Office",
+      "handle": -1761601130,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000b01_00.glb",
+      "location_cm": [
+        -2600.0,
+        0.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "cell": "A4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_icf01021030",
+      "name": "Thatched House (Islander)",
+      "handle": -1744823913,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000302_00.glb",
+      "location_cm": [
+        250.0,
+        -500.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        180.0,
+        0.0
+      ],
+      "cell": "D4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_ico01090210",
+      "name": "Island Sign",
+      "handle": -1577051743,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000d14_00.glb",
+      "location_cm": [
+        -150.0,
+        -550.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        90.0,
+        0.0
+      ],
+      "cell": "D4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_ico04050070",
+      "name": "Campfire",
+      "handle": -1543497309,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000e06_00.glb",
+      "location_cm": [
+        400.0,
+        -900.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        270.0,
+        0.0
+      ],
+      "cell": "D4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_ico01090160",
+      "name": "Stack of Firewood",
+      "handle": -1476388441,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft001102_00.glb",
+      "location_cm": [
+        400.0,
+        -1100.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        180.0,
+        0.0
+      ],
+      "cell": "D3"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_ico01020030",
+      "name": "Tropical Stone Bench",
+      "handle": -1426056790,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000f02_00.glb",
+      "location_cm": [
+        550.0,
+        -950.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        180.0,
+        0.0
+      ],
+      "cell": "D4"
+    },
+    {
+      "kind": "craft",
+      "id": "obj_icf01021030",
+      "name": "Thatched House (Islander)",
+      "handle": -822078258,
+      "glb": "E:\\Fantasy Life i - Stolen Hours\\editor\\stolenhours\\webgui\\web\\game\\craft3d\\m\\mdl_cft000302_00.glb",
+      "location_cm": [
+        -200.0,
+        -100.0,
+        0.0
+      ],
+      "rotation_deg": [
+        0.0,
+        270.0,
+        0.0
+      ],
+      "cell": "C4"
+    }
+  ]
+}

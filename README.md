@@ -48,6 +48,40 @@ Nothing is hardcoded. `StolenHours.cmd where` shows what was detected:
 - Under Proton (Steam Deck): also `~/.local/share/Steam` and flatpak Steam through `Z:`, Linux library paths
   mapped to `Z:`, and the game-running check reads `/proc` (`stolenhours\deck.py`).
 
+## Portable Windows exe (any PC)
+Hand someone the zip folder (`StolenHours.exe` + `_internal` + `START HERE.txt`). It does **not** ship Unholy’s
+paths, Steam id, or keys. On their PC it finds Steam / Fantasy Life i / saves itself and reads the save key from
+**their** game install.
+
+**Brother test (yes, this is the point):**
+1. Unzip anywhere → double-click **`StolenHours.exe`**. No console, no Python, no “run as admin.”
+2. Needs: Windows + a Steam Fantasy Life i install + at least one save (play once).
+3. If **Microsoft Edge WebView2 Runtime** is missing, it says so and offers the official install (or continue in
+   the normal browser — same editor).
+4. Windows download-block (Mark of the Web) is cleared automatically on launch.
+5. Live Map is optional: close the game → Live Map → **Install Live setup** once → start game → load save.
+
+Useful flags: `--check` (setup checklist), `--browser` (force browser UI).
+
+On first run it checks what this PC has:
+
+| Check | If missing |
+|---|---|
+| **Edge WebView2 Runtime** (recommended) | Editor offers the official Evergreen installer link, then asks you to reopen Stolen Hours. Without it, it opens in your browser instead of a native window. |
+| **.NET Framework 4.8** | Only needed for a legacy UI path; browser / WebView2 mode works without it. |
+| **A web browser** | Required fallback UI — install Edge/Chrome/Firefox if somehow none is available. |
+| **Fantasy Life i + a save** | Soft warning: install/play once so the editor can find a save and the AES key. |
+
+Useful flags:
+
+| Flag | Does |
+|---|---|
+| `StolenHours.exe --check` | Print / show the setup checklist (`%LOCALAPPDATA%\StolenHours\setup_check.txt`) |
+| `StolenHours.exe --browser` | Skip the native window; always use the system browser |
+| `StolenHours.exe --selftest` | Write discovery + roundtrip results to `%LOCALAPPDATA%\StolenHours\selftest.txt` |
+
+If you see a crash about `Python.Runtime.dll` / pythonnet: install WebView2, or run with `--browser`.
+
 ## Steam Deck
 The exe build ships `StolenHours-Deck.sh` and `STEAM_DECK.txt`: add the script as a non-Steam game; it runs the exe
 through Proton and opens the editor full screen in a browser for Game Mode. Controller and keyboard navigation

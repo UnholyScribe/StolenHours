@@ -22,6 +22,7 @@
     <select id="save-select"></select>
     <div class="title-actions">
       <button class="btn btn-green" id="start-btn">Start</button>
+      <button class="btn btn-cream" type="button" data-music-toggle>Music on</button>
     </div>
     <div class="title-note" id="title-note"></div>
   </div>
@@ -33,6 +34,7 @@
     <header id="topbar">
       <div class="screen-tab"><img class="ico" id="screen-icon" alt=""><span id="screen-title">Adventurer</span></div>
       <div class="topbar-right">
+        <button class="btn btn-cream btn-small music-chip" type="button" data-music-toggle>Music on</button>
         <div class="chip" id="mode-chip">Mode A</div>
         <div class="dosh-pill" title="Dosh in the loaded save"><img src="game/coin.png" alt=""><span id="top-dosh">0</span></div>
       </div>
@@ -79,8 +81,10 @@
 <div id="busy" hidden><div class="spinner"></div><div id="busy-text">Working...</div></div>
 
 <script type="importmap">{"imports": {"three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/"}}</script>
+<script src="music.js?v={{v}}"></script>
 <script src="app.js?v={{v}}"></script>
 <script src="pad.js?v={{v}}"></script>
 <script type="module" src="look3d.js?v={{v}}"></script>
+<script type="module" src="village3d.js?v={{v}}"></script>
 </body>
 </html>

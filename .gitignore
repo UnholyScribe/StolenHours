@@ -19,3 +19,27 @@ tools/asset_extract/obj/
 # Discord bot: token and member XP stay local
 discord_bot/.env
 discord_bot/data/
+# Game BGM (local only; playlist.json stays)
+editor/stolenhours/webgui/web/music/*.ogg
+# Scratch / huge local ref screenshots
+research/tmp/
+research/tmp_*.py
+notes/ref-village/
+notes/refs/**/*.jpg
+notes/refs/**/*.png
+# UE survey scaffold build junk
+tools/SurveyMathWorker/Binaries/
+tools/SurveyMathWorker/Intermediate/
+tools/SurveyMathWorker/Saved/
+tools/SurveyMathWorker/DerivedDataCache/
+
+# Game BGM (local only; playlist stays)
+editor/stolenhours/webgui/web/music/*.ogg
+research/tmp/
+research/tmp_*.py
+
+tools/SurveyMathWorker/Binaries/
+tools/SurveyMathWorker/Intermediate/
+tools/SurveyMathWorker/Saved/
+tools/SurveyMathWorker/DerivedDataCache/
+

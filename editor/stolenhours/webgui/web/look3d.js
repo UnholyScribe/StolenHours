@@ -37,7 +37,8 @@ function tex(name, srgb = false) {
 }
 
 async function glb(name) {
-  if (!buffers.has(name)) buffers.set(name, fetch(BASE + name).then((r) => r.arrayBuffer()));
+  // no-store: WebView2 otherwise keeps an old glb after a rebuild (PetDesigner cache lesson)
+  if (!buffers.has(name)) buffers.set(name, fetch(BASE + name, { cache: "no-store" }).then((r) => r.arrayBuffer()));
   const g = await loader.parseAsync((await buffers.get(name)).slice(0), "");
   return g.scene || g.scenes[0];
 }
@@ -228,6 +229,8 @@ async function buildRig(look, heldFiles = [], gear = {}) {
   // Body sizes are applied in component space (Avatar_BoneModify_AnimBP: LocalToComponentSpace, then
   // CharamakeBoneModify), so a bone's scale only reshapes its own vertices and does not carry down the chain to
   // the hands and held items. The scale goes into the bind matrices instead of the bone.
+  // PetDesigner/NMS needed a Three.js updateMatrixWorld override because *their* engine does not inherit
+  // bone scale. FLi does the opposite of that hack — do not copy their scale override here.
   const sized = {};
   for (const [name, b] of Object.entries(manifest.sizes[look.BodyId] || {})) {
     const bone = master[name];
@@ -287,7 +290,7 @@ async function rebuild() {
   const ticket = ++building;
   const [g, a] = await Promise.all([
     buildRig(lastLook, heldFiles(poseKey), gearFor(poseKey)),
-    manifest.anims?.[poseKey] ? fetch(BASE + manifest.anims[poseKey], { cache: "no-cache" }).then((r) => r.json()).catch(() => null) : null,
+    manifest.anims?.[poseKey] ? fetch(BASE + manifest.anims[poseKey], { cache: "no-store" }).then((r) => r.json()).catch(() => null) : null,
   ]);
   if (ticket !== building) return;
   if (rig) scene.remove(rig);
@@ -354,8 +357,12 @@ function frame() {
 function faceView(close) {
   closeUp = close;
   if (!close) return frame();
-  ctl.target.set(0, 1.0, 0);
-  cam.position.set(1.9, 1.05, 0.3);
+  // Portrait mid-shot (Unholy 2026-10-17): mid-thigh through full hair — not a head crop.
+  const t = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+  const span = 1.52;
+  const dist = (span / (2 * t)) * 1.06;
+  ctl.target.set(0, 0.90, 0);
+  cam.position.copy(new THREE.Vector3(3.6, 0.18, 1.05).normalize().multiplyScalar(dist).add(ctl.target));
   ctl.update();
 }
 
@@ -364,7 +371,7 @@ function faceView(close) {
 // picked on the Licenses tab), bar (false hides the pose picker), barHost (element for the picker; default: on
 // top of the view), onPose (called when the user picks a pose).
 async function show(container, look, opts = {}) {
-  if (!manifest) manifest = await fetch(BASE + "manifest.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!manifest) manifest = await fetch(BASE + "manifest.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (!manifest) { container.classList.add("no3d"); return false; }
   if (!renderer) setup();
   host = container;
@@ -376,9 +383,9 @@ async function show(container, look, opts = {}) {
   if (opts.bar === false) { if (poseKey === null) poseKey = "menu"; } else poseBar(opts.barHost || container, opts.lives, opts.life);
   lastLook = look;
   await rebuild();
-  // Character-creation style: face tabs pull in close; body/full stays framed.
-  if (opts.faceClose != null) faceView(!!opts.faceClose);
-  else if (!closeUp) frame();
+  // Always re-frame: face tabs on Look pull in; Adventurer / Licenses / body stay full-body.
+  // (Do not keep a leftover close-up when leaving Look — that stuck Adventurer on the face.)
+  faceView(!!opts.faceClose);
   return true;
 }
 

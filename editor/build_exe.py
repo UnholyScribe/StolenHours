@@ -18,6 +18,7 @@ from stolenhours import modinstall, paths
 EDITOR = Path(__file__).resolve().parent
 WEB = paths.PACKAGE_DIR / "webgui" / "web"
 DECK = EDITOR / "deck"  # Steam Deck launcher and instructions, shipped next to the exe
+SHIP = EDITOR / "ship"  # Windows helpers (Unblock/Run), shipped next to the exe
 PARSER_DATA = ("fli_sav_pattern.txt", "itemlist.txt", "skilllist.txt", "flaglist.txt")
 
 
@@ -52,6 +53,11 @@ def main(dest: Path) -> None:
     data = [f"{WEB};stolenhours/webgui/web"]
     data += [f"{paths.COMMUNITY_EDITOR / n};tools/fli_save_editor" for n in PARSER_DATA]
     data += [f"{modinstall.BUNDLED};hook/ue4ss_mod/{modinstall.MOD_NAME}"]
+    ue4ss = EDITOR.parent / "tools" / "ue4ss" / "dist"
+    if (ue4ss / "dwmapi.dll").is_file():
+        data += [f"{ue4ss};tools/ue4ss/dist"]
+    else:
+        print("WARNING: tools/ue4ss/dist missing — Live Map one-click setup will not ship")
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--onedir",
            "--name", "StolenHours", "--icon", str(icon),
            "--distpath", str(work / "dist"), "--workpath", str(work / "build"), "--specpath", str(work),
@@ -71,6 +77,10 @@ def main(dest: Path) -> None:
     shutil.copytree(out, dest, dirs_exist_ok=True)
     for f in DECK.iterdir():
         (dest / f.name).write_bytes(f.read_bytes().replace(b"\r\n", b"\n"))  # bash refuses CRLF scripts
+    if SHIP.is_dir():
+        for f in SHIP.iterdir():
+            if f.is_file():
+                shutil.copy2(f, dest / f.name)
     shutil.rmtree(work, ignore_errors=True)
     print(f"built {dest / 'StolenHours.exe'}")
 

@@ -4,6 +4,7 @@
 //        asset_extract <paksDir> <aesKeyHex> <mappings.usmap> raw <regex> <outDir>      (file bytes as packaged)
 //        asset_extract <paksDir> <aesKeyHex> <mappings.usmap> json <regex> <outDir>     (asset exports as JSON)
 //        asset_extract <paksDir> <aesKeyHex> <mappings.usmap> mesh <regex> <outDir>     (meshes -> glTF + materials)
+//        asset_extract <paksDir> <aesKeyHex> <mappings.usmap> world <regex> <outDir>    (UWorld -> USD + streaming meshes)
 //        asset_extract <paksDir> <aesKeyHex> <mappings.usmap> anim <regex> <outDir>     (anim sequences -> per-frame local
 //                                                                                        bone transforms, UE space, JSON)
 using System.Text.RegularExpressions;
@@ -14,7 +15,9 @@ using CUE4Parse.MappingsProvider.Usmap;
 using CUE4Parse_Conversion.Options;
 using CUE4Parse.UE4.Assets.Exports.Texture;
 using CUE4Parse.UE4.Objects.Core.Misc;
+using CUE4Parse.UE4.Objects.Engine;
 using CUE4Parse.UE4.Versions;
+using CUE4Parse_Conversion.Exporters;
 using CUE4Parse_Conversion.Textures;
 using CUE4Parse_Conversion;
 
@@ -64,17 +67,24 @@ if (mode == "json")
     return 0;
 }
 TextureDecoder.UseAssetRipperTextureDecoder = true;
-if (mode == "mesh")
+if (mode == "mesh" || mode == "world")
 {
-    var options = new ExportOptions(meshFormat: EMeshFormat.Gltf2, exportMorphTargets: false, socketFormat: ESocketFormat.None);
+    var meshFmt = mode == "world" ? EMeshFormat.USD : EMeshFormat.Gltf2;
+    var options = new ExportOptions(meshFormat: meshFmt, exportMorphTargets: false, socketFormat: ESocketFormat.None);
     var session = new ExportSession(null);
-    foreach (var p in matches.Where(p => p.EndsWith(".uasset")))
+    var pkgs = matches.Where(p => mode == "world" ? p.EndsWith(".umap") : p.EndsWith(".uasset"));
+    foreach (var p in pkgs)
     {
         try
         {
             foreach (var obj in provider.LoadPackage(p).GetExports())
-                if (obj is CUE4Parse.UE4.Assets.Exports.SkeletalMesh.USkeletalMesh or CUE4Parse.UE4.Assets.Exports.StaticMesh.UStaticMesh)
+            {
+                if (mode == "world" && obj is UWorld world)
+                    session.Add(new WorldExporter(world));
+                else if (mode == "mesh" && obj is CUE4Parse.UE4.Assets.Exports.SkeletalMesh.USkeletalMesh
+                         or CUE4Parse.UE4.Assets.Exports.StaticMesh.UStaticMesh)
                     session.Add(obj);
+            }
         }
         catch (Exception e) { Console.Error.WriteLine($"{p}: {e.Message}"); }
     }

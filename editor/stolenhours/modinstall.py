@@ -1,9 +1,9 @@
 """Install or update the StolenHours UE4SS mod that ships inside the editor, on whatever PC the editor runs on.
 
-UE4SS itself is not shipped: it has to be installed already (<game>/Game/Binaries/Win64/ue4ss/UE4SS.dll, or the
-older layout with UE4SS.dll and Mods/ next to the game exe). A mod is switched on by a `<name> : 1` line in
-Mods/mods.txt (that is how Unholy's working install enables it; it is not listed in mods.json).
-Existing mod files are backed up with SHA-256 first; the game must be closed.
+When the portable build includes tools/ue4ss/dist (dwmapi.dll + ue4ss/), Install Live Setup can put
+UE4SS + the StolenHours mod into the user's game folder in one click (game must be closed).
+A mod is switched on by a `<name> : 1` line in Mods/mods.txt.
+Existing mod files are backed up with SHA-256 first.
 """
 from __future__ import annotations
 
@@ -16,10 +16,13 @@ from . import paths, safety
 
 MOD_NAME = "StolenHours"
 BUNDLED = paths.PROJECT_ROOT / "hook" / "ue4ss_mod" / MOD_NAME
+# Dev tree: tools/ue4ss/dist. Frozen exe: same path under _MEIPASS.
+UE4SS_DIST = paths.PROJECT_ROOT / "tools" / "ue4ss" / "dist"
 MOD_BACKUPS = (paths.USER_DATA / "mod_backups") if paths.FROZEN else paths.PROJECT_ROOT / "backups" / "mod"
 _VERSION = re.compile(r'local VERSION = "([^"]+)"')
 _ENTRY = re.compile(rf"^\s*{MOD_NAME}\s*:\s*(\d)\s*$", re.M)
 _KEYBINDS_NOTE = "; Built-in keybinds"
+SHIPPING_REL = "Game\\Binaries\\Win64\\NFL1-Win64-Shipping.exe"
 
 
 def _version(main_lua: Path) -> str | None:
@@ -42,9 +45,14 @@ def _bundled_files() -> list[Path]:
     return sorted(p for p in BUNDLED.rglob("*") if p.is_file())
 
 
+def ue4ss_bundled() -> bool:
+    return (UE4SS_DIST / "dwmapi.dll").is_file() and (UE4SS_DIST / "ue4ss" / "UE4SS.dll").is_file()
+
+
 def status(game: Path | None = None) -> dict:
     out = {"bundled": _version(BUNDLED / "Scripts" / "main.lua"), "game": None, "ue4ss": False,
-           "installed": None, "enabled": False, "current": False}
+           "installed": None, "enabled": False, "current": False, "ue4ss_bundled": ue4ss_bundled(),
+           "can_live_setup": False}
     try:
         game = game or paths.game_dir()
     except paths.NotFound:
@@ -52,6 +60,7 @@ def status(game: Path | None = None) -> dict:
     out["game"] = str(game)
     mods = mods_dir(game)
     if mods is None:
+        out["can_live_setup"] = out["ue4ss_bundled"]
         return out
     out["ue4ss"] = True
     out["installed"] = _version(mods / MOD_NAME / "Scripts" / "main.lua")
@@ -64,7 +73,65 @@ def status(game: Path | None = None) -> dict:
     out["current"] = out["enabled"] and all(
         (target / f.relative_to(BUNDLED)).exists()
         and safety.sha256_file(target / f.relative_to(BUNDLED)) == safety.sha256_file(f) for f in _bundled_files())
+    # Offer setup when UE4SS is missing (and we ship it) or the mod is missing/outdated.
+    out["can_live_setup"] = (not out["current"]) and (out["ue4ss"] or out["ue4ss_bundled"])
     return out
+
+
+def _skip_eac(game: Path) -> None:
+    """Point GameBootstrapper at the shipping exe so Steam launches without EAC (needed for UE4SS)."""
+    ini = game / "GameBootstrapper.ini"
+    if not ini.is_file():
+        return
+    text = ini.read_text(encoding="utf-8", errors="replace")
+    if "ApplicationPath=EACLauncher.exe" not in text:
+        return
+    stamp = _dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    backup = MOD_BACKUPS / f"{stamp}_GameBootstrapper.ini"
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ini, backup)
+    ini.write_text(text.replace("ApplicationPath=EACLauncher.exe", f"ApplicationPath={SHIPPING_REL}"),
+                   encoding="utf-8", newline="")
+
+
+def install_ue4ss(game: Path | None = None, skip_eac: bool = True) -> dict:
+    """Copy bundled UE4SS into the game Win64 folder. Game must be closed."""
+    safety.require_game_closed()
+    if not ue4ss_bundled():
+        raise safety.SafetyError(
+            "This build does not include UE4SS. Use a full Stolen Hours release zip, "
+            "or install UE4SS into the game folder yourself, then press Install mod.")
+    game = game or paths.game_dir()
+    win64 = game / "Game" / "Binaries" / "Win64"
+    if not (win64 / "NFL1-Win64-Shipping.exe").is_file():
+        raise safety.SafetyError(f"game shipping exe not found under {win64}")
+    if skip_eac:
+        _skip_eac(game)
+    shutil.copy2(UE4SS_DIST / "dwmapi.dll", win64 / "dwmapi.dll")
+    dest_ue4ss = win64 / "ue4ss"
+    if dest_ue4ss.exists():
+        shutil.rmtree(dest_ue4ss)
+    shutil.copytree(UE4SS_DIST / "ue4ss", dest_ue4ss)
+    settings = dest_ue4ss / "UE4SS-settings.ini"
+    if settings.is_file():
+        text = settings.read_text(encoding="utf-8", errors="replace")
+        settings.write_text(text.replace("EnableHotReloadSystem = 0", "EnableHotReloadSystem = 1"),
+                            encoding="utf-8")
+    paths.LIVE_DIR.mkdir(parents=True, exist_ok=True)
+    return status(game)
+
+
+def install_live(game: Path | None = None, skip_eac: bool = True) -> dict:
+    """One-click Live Map / Time Hook setup: UE4SS (if bundled) + StolenHours mod."""
+    safety.require_game_closed()
+    game = game or paths.game_dir()
+    st = status(game)
+    if not st["ue4ss"]:
+        st = install_ue4ss(game, skip_eac=skip_eac)
+    mod = install(game)
+    return {**mod, "ue4ss": True, "live_setup": True,
+            "note": "Start Fantasy Life i from Steam, load a save, then open Live Map. "
+                    "Multiplayer is off while EAC is skipped."}
 
 
 def _enable(mods_txt: Path) -> None:

@@ -17,7 +17,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .. import (collection, companions, forge, gear, island, live, mapevents, mapview, modinstall, paths, records,
-                rewalk, safety, savefile, skilltree, uiassets)
+                village_presets,
+                rewalk, safety, savefile, skilltree, uiassets, village)
 
 WEB_DIR = paths.PACKAGE_DIR / "webgui" / "web"
 LIVE_DOSH = ("GDDPlayData", "m_permanent.Money")
@@ -29,12 +30,76 @@ LIVE_EVENT_PATHS = [("GDDQuestStatus", "m_permanent.ActiveEventInfo"),
                     ("GDDQuestStatus", "m_volatile.ActiveEventStatusV.openActiveEventList"),
                     ("GDDQuestStatus", "m_permanent.Active")]
 
-# the pywebview window, once app.py opens it; None in browser mode (no native file dialogs there)
+# the pywebview window, once app.py opens it; None in browser mode
 WINDOW = None
 BIN_TYPES = ("Fantasy Life i save (*.bin)", "All files (*.*)")
 
+
+def _win_file_dialog(mode: str, name: str = "") -> str | None:
+    """ctypes GetOpenFileName / GetSaveFileName when pywebview has no window (browser mode)."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+
+    class OPENFILENAMEW(ctypes.Structure):
+        _fields_ = [
+            ("lStructSize", wintypes.DWORD),
+            ("hwndOwner", wintypes.HWND),
+            ("hInstance", wintypes.HINSTANCE),
+            ("lpstrFilter", wintypes.LPCWSTR),
+            ("lpstrCustomFilter", wintypes.LPWSTR),
+            ("nMaxCustFilter", wintypes.DWORD),
+            ("nFilterIndex", wintypes.DWORD),
+            ("lpstrFile", wintypes.LPWSTR),
+            ("nMaxFile", wintypes.DWORD),
+            ("lpstrFileTitle", wintypes.LPWSTR),
+            ("nMaxFileTitle", wintypes.DWORD),
+            ("lpstrInitialDir", wintypes.LPCWSTR),
+            ("lpstrTitle", wintypes.LPCWSTR),
+            ("Flags", wintypes.DWORD),
+            ("nFileOffset", wintypes.WORD),
+            ("nFileExtension", wintypes.WORD),
+            ("lpstrDefExt", wintypes.LPCWSTR),
+            ("lCustData", wintypes.LPARAM),
+            ("lpfnHook", wintypes.LPVOID),
+            ("lpTemplateName", wintypes.LPCWSTR),
+            ("pvReserved", wintypes.LPVOID),
+            ("dwReserved", wintypes.DWORD),
+            ("FlagsEx", wintypes.DWORD),
+        ]
+
+    buf = ctypes.create_unicode_buffer(1024)
+    if name:
+        buf.value = name[:1023]
+    ofn = OPENFILENAMEW()
+    ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
+    ofn.lpstrFilter = "Fantasy Life i save (*.bin)\0*.bin\0All files (*.*)\0*.*\0\0"
+    ofn.lpstrFile = buf
+    ofn.nMaxFile = 1024
+    ofn.lpstrDefExt = "bin"
+    comdlg = ctypes.windll.comdlg32
+    if mode == "save":
+        ofn.Flags = 0x00080000 | 0x00000002  # EXPLORER | OVERWRITEPROMPT
+        ofn.lpstrTitle = "Save Fantasy Life i backup as"
+        ok = comdlg.GetSaveFileNameW(ctypes.byref(ofn))
+    else:
+        ofn.Flags = 0x00080000 | 0x00001000  # EXPLORER | FILEMUSTEXIST
+        ofn.lpstrTitle = "Open Fantasy Life i save (gamedata.bin)"
+        ok = comdlg.GetOpenFileNameW(ctypes.byref(ofn))
+    return buf.value if ok and buf.value else None
+
+
 mimetypes.add_type("font/otf", ".otf")
 mimetypes.add_type("text/javascript", ".js")
+# Craft3d Diff maps are WebP — without this, WebView2 TextureLoader gets octet-stream and
+# materials stay white (Look avatar PNGs were fine; village houses were not).
+mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("model/gltf-binary", ".glb")
+mimetypes.add_type("model/gltf+json", ".gltf")
 
 
 class ApiError(Exception):
@@ -104,8 +169,22 @@ class Backend:
         return self._disk_seen[1]
 
     def api_load(self, path: str = "") -> dict:
-        target = Path(path) if path else (self.save_path or paths.default_save_path())
-        sf = savefile.SaveFile.load(target)
+        try:
+            target = Path(path) if path else (self.save_path or paths.default_save_path())
+        except paths.NotFound as e:
+            raise ApiError(
+                f"{e} Typical Steam path: Steam\\userdata\\<id>\\2993780\\remote\\*gamedata.bin. "
+                "Use Other file… to browse, or play once and save in-game.") from e
+        try:
+            sf = savefile.SaveFile.load(target)
+        except Exception as e:
+            msg = str(e) or type(e).__name__
+            if "key" in msg.lower() or "could not find the save key" in msg.lower():
+                raise ApiError(
+                    f"Found the save but could not read the encryption key from Fantasy Life i on this PC. "
+                    f"Install/launch the game once so Stolen Hours can find NFL1-Win64-Shipping.exe. ({msg})"
+                ) from e
+            raise ApiError(f"Could not open {target.name}: {msg}") from e
         with self.lock:
             self.sf, self.save_path = sf, target
         self._record_history(sf)
@@ -335,22 +414,26 @@ class Backend:
             subprocess.Popen(["xdg-open", str(paths.BACKUP_ROOT)])
 
     def api_pick(self, mode: str, name: str = "") -> dict:
-        """Native Save As / Open dialog; {"path": None} if cancelled, {"manual": True} without a window."""
-        if WINDOW is None:
-            return {"manual": True}
-        import webview
-        kind = getattr(webview, "FileDialog", None)
-        if mode == "save":
-            dlg = kind.SAVE if kind else webview.SAVE_DIALOG
-            got = WINDOW.create_file_dialog(dlg, save_filename=name, file_types=BIN_TYPES)
-        elif mode == "open":
-            dlg = kind.OPEN if kind else webview.OPEN_DIALOG
-            got = WINDOW.create_file_dialog(dlg, allow_multiple=False, file_types=BIN_TYPES)
-        else:
+        """Native Save As / Open dialog; {"path": None} if cancelled."""
+        if mode not in ("save", "open"):
             raise ApiError("mode must be save or open")
-        if isinstance(got, (list, tuple)):
-            got = got[0] if got else None
-        return {"path": got or None}
+        if WINDOW is not None:
+            import webview
+            kind = getattr(webview, "FileDialog", None)
+            if mode == "save":
+                dlg = kind.SAVE if kind else webview.SAVE_DIALOG
+                got = WINDOW.create_file_dialog(dlg, save_filename=name, file_types=BIN_TYPES)
+            else:
+                dlg = kind.OPEN if kind else webview.OPEN_DIALOG
+                got = WINDOW.create_file_dialog(dlg, allow_multiple=False, file_types=BIN_TYPES)
+            if isinstance(got, (list, tuple)):
+                got = got[0] if got else None
+            return {"path": got or None}
+        # Browser / no webview window: still offer a real Windows picker from this process.
+        got = _win_file_dialog(mode, name)
+        if got is not None:
+            return {"path": got or None}
+        return {"manual": True}
 
     def api_backup_to(self, path: str) -> dict:
         save = self._save_on_disk()
@@ -512,6 +595,171 @@ class Backend:
                 raise ApiError(f"unknown companions action {action}")
             return {"companions": c.state(sf), "note": note, "summary": self.api_summary()}
 
+    def _village(self) -> village.Village:
+        if getattr(self, "_village_data", None) is None:
+            try:
+                self._village_data = village.Village.load()
+            except FileNotFoundError:
+                raise ApiError("village data not built; run: py -3.12 -m stolenhours build-ui")
+        return self._village_data
+
+    def api_village(self, map_id: str = "Map_000100", kind: str | None = None) -> dict:
+        with self.lock:
+            v = self._village()
+            st = v.state(self._need(), map_id=str(map_id), kind=kind)
+            # Prefer client-side craft.json for the full catalog; small sample kept as fallback.
+            st["catalog"] = v.catalog(limit=120)
+            for hh in st.get("houses") or []:
+                meta = v.houses.get(hh["id"]) or {}
+                hh["name"] = meta.get("name") or hh.get("id")
+            return st
+
+    def api_village_catalog(self, q: str = "", category: str = "", limit: int = 400) -> dict:
+        return {"objects": self._village().catalog(q=q, category=category, limit=int(limit or 400))}
+
+    def api_village_terrain(self, map_id: str = "Map_000100") -> dict:
+        with self.lock:
+            return self._village().terrain_grid(self._need(), map_id=str(map_id))
+
+    def api_village_edit(self, action: str, free: bool = False, craft_obj_id: str | None = None,
+                         handle: int | None = None, map_id: str = "Map_000100",
+                         location: list | None = None, rotation: list | None = None,
+                         house_id: str | None = None, kind: str | None = None,
+                         ix: int | None = None, iy: int | None = None) -> dict:
+        v = self._village()
+        with self.lock:
+            sf = self._need()
+            free = bool(free)
+            if action == "place":
+                r = v.place(sf, str(craft_obj_id), str(map_id), list(location or [0, 0, 0]),
+                            list(rotation) if rotation else None, free=free, kind=kind)
+                note = f"placed {craft_obj_id}" + (" (Free)" if free else " (Legal)")
+            elif action == "move":
+                r = v.move(sf, int(handle), list(location) if location is not None else None,
+                           list(rotation) if rotation is not None else None, map_id=map_id, kind=kind)
+                note = f"moved handle {handle}"
+            elif action == "rotate":
+                r = v.rotate90(sf, int(handle))
+                note = f"rotated handle {handle}"
+            elif action == "remove":
+                r = v.remove(sf, int(handle), free=free)
+                note = f"removed {r.get('removed')}"
+            elif action == "place_house":
+                r = v.place_house(sf, str(house_id), list(location or [0, 0, 0]),
+                                  list(rotation) if rotation else None, free=free, map_id=str(map_id))
+                note = f"placed house {house_id}" + (f" — {r.get('note')}" if r.get("note") else "")
+            elif action == "move_house":
+                r = v.move_house(sf, str(house_id), list(location or [0, 0, 0]),
+                                 list(rotation) if rotation else None)
+                note = f"moved house {house_id}"
+            elif action == "terrain_raise":
+                r = v.terrain_raise(sf, int(ix), int(iy), map_id=str(map_id))
+                note = f"raised terrain ({ix},{iy}) → tier {r.get('h')}"
+            elif action == "terrain_lower":
+                r = v.terrain_lower(sf, int(ix), int(iy), map_id=str(map_id))
+                note = f"lowered terrain ({ix},{iy}) → tier {r.get('h')}"
+            elif action == "terrain_level":
+                r = v.terrain_level(sf, int(ix), int(iy), map_id=str(map_id))
+                note = f"leveled terrain ({ix},{iy}) → tier {r.get('h')}"
+            else:
+                raise ApiError(f"unknown village action {action}")
+            st = v.state(sf, map_id=str(map_id), kind=kind)
+            st["catalog"] = v.catalog(limit=120)
+            for hh in st.get("houses") or []:
+                meta = v.houses.get(hh["id"]) or {}
+                hh["name"] = meta.get("name") or hh.get("id")
+            out = {"village": st, "result": r, "note": note, "summary": self.api_summary()}
+            if action in ("terrain_raise", "terrain_lower", "terrain_level"):
+                out["terrain"] = v.terrain_grid(sf, map_id=str(map_id))
+            return out
+
+    def api_village_presets(self, action: str = "list", name: str = "", map_id: str = "Map_000100",
+                            kind: str = "map", include_terrain: bool = False, note: str = "",
+                            free: bool = True, replace: bool = True) -> dict:
+        v = self._village()
+        if action == "list":
+            return {"presets": village_presets.list_presets()}
+        if action == "export":
+            with self.lock:
+                return village_presets.export_layout(
+                    self._need(), v, str(name), map_id=str(map_id), kind=str(kind),
+                    include_terrain=bool(include_terrain), note=str(note or ""))
+        if action == "import":
+            with self.lock:
+                r = village_presets.import_layout(
+                    self._need(), v, str(name), free=bool(free), replace=bool(replace))
+                r["summary"] = self.api_summary()
+                return r
+        if action == "delete":
+            return village_presets.delete_preset(str(name))
+        raise ApiError(f"unknown village_presets action {action}")
+
+    def api_village_live(self, action: str = "status", handle: int | None = None,
+                         location: list | None = None, yaw: float = 0.0) -> dict:
+        """Drive / inspect in-game craft actors (mod 0.7+). Game is the renderer."""
+        b = self.bridge
+        if not b.mod_alive():
+            return {"ok": False, "mod": False, "text": "live mod not running"}
+        if action == "status":
+            r = b.craft_status()
+            cam = b.cam_status()
+            return {"ok": r.ok, "mod": True, "text": r.text, "camera": cam.text if cam.ok else cam.text}
+        if action == "list":
+            r = b.craft_list()
+            actors = []
+            if r.ok and "|" in r.text:
+                count, _, rest = r.text.partition("|")
+                for chunk in rest.split(";"):
+                    if not chunk or ":" not in chunk:
+                        continue
+                    h, _, pose = chunk.partition(":")
+                    parts = pose.split(",")
+                    if len(parts) < 5:
+                        continue
+                    actors.append({
+                        "handle": int(float(h)),
+                        "x": float(parts[0]), "y": float(parts[1]), "z": float(parts[2]),
+                        "yaw": float(parts[3]), "craftObjId": parts[4],
+                    })
+            return {"ok": r.ok, "mod": True, "text": r.text, "actors": actors}
+        if action == "teleport":
+            loc = list(location or [0, 0, 0])
+            if handle is None or len(loc) < 3:
+                raise ApiError("teleport needs handle + location [x,y,z]")
+            r = b.craft_teleport(int(handle), float(loc[0]), float(loc[1]), float(loc[2]), float(yaw or 0))
+            return {"ok": r.ok, "mod": True, "text": r.text}
+        if action == "cam_unlock":
+            r = b.cam_unlock()
+            return {"ok": r.ok, "mod": True, "text": r.text}
+        raise ApiError(f"unknown village_live action {action}")
+
+    def api_survey_truth(self, refresh: bool = False) -> dict:
+        """Load Base Camp survey math tables (grid + objects) for Village schematic alignment."""
+        from .. import survey_math
+        root = survey_math.survey_root()
+        grid_p, obj_p = root / "grid.json", root / "objects.json"
+        if refresh or not grid_p.exists() or not obj_p.exists():
+            survey_math.export_all()
+        grid = json.loads(grid_p.read_text(encoding="utf-8")) if grid_p.exists() else {}
+        objects = json.loads(obj_p.read_text(encoding="utf-8")) if obj_p.exists() else {}
+        # Capture progress: how many yaw PNGs exist
+        captured = 0
+        cells = grid.get("cells") or []
+        for cell in cells:
+            folder = root / cell["id"]
+            if folder.is_dir() and any(folder.glob("yaw*.png")):
+                captured += 1
+        return {
+            "ok": bool(grid and objects),
+            "root": str(root),
+            "grid": grid,
+            "objects": objects,
+            "axes_path": str(root / "axes.md"),
+            "cells": len(cells),
+            "cells_captured": captured,
+            "object_count": objects.get("count") or len(objects.get("objects") or []),
+        }
+
     def api_rewalk_status(self) -> dict:
         return rewalk.status()
 
@@ -524,6 +772,10 @@ class Backend:
 
     def api_mod_install(self) -> dict:
         return modinstall.install()
+
+    def api_mod_install_live(self) -> dict:
+        """One-click UE4SS (if shipped) + StolenHours mod for Live Map / Time Hook."""
+        return modinstall.install_live()
 
     def api_mapview_live(self) -> dict:
         """Read-only snapshot of the running game for the live map: events in play and the player's position."""
@@ -589,6 +841,10 @@ class Backend:
                 if num not in ((0, 1) if key == "period" else (1, 2, 3)):
                     raise ApiError(f"bad {key} value {value}")
             r = b.set(*LIVE_CLOCK[key], num)
+        elif action == "craft_status":
+            r = b.craft_status()
+        elif action == "cam_unlock":
+            r = b.cam_unlock()
         else:
             raise ApiError(f"unknown live action {action}")
         return {"ok": r.ok, "text": r.text}
@@ -622,10 +878,16 @@ class Handler(BaseHTTPRequestHandler):
         body = target.read_bytes()
         if rel == "index.html":
             # WebView2 can keep stale scripts despite no-store; versioned URLs force a fresh fetch
-            v = str(int(max((WEB_DIR / n).stat().st_mtime for n in ("app.js", "pad.js", "style.css", "look3d.js"))))
+            v = str(int(max((WEB_DIR / n).stat().st_mtime for n in
+                            ("app.js", "pad.js", "style.css", "look3d.js", "village3d.js", "music.js"))))
             body = body.replace(b"{{v}}", v.encode())
+        # PetDesigner lesson: stale packs lock wrong meshes forever. Cache only heavy
+        # immutable binaries under game/; never JS/CSS/JSON/manifests.
+        ext = target.suffix.lower()
+        cache = rel.startswith("game/") and ext in (
+            ".png", ".jpg", ".jpeg", ".webp", ".glb", ".gltf", ".otf", ".ttf", ".woff", ".woff2", ".ogg", ".mp3")
         self._send(200, body, mimetypes.guess_type(target.name)[0] or "application/octet-stream",
-                   cache=rel.startswith("game/"))
+                   cache=cache)
 
     def do_POST(self):
         if self.headers.get("X-Token") != self.token or not self.path.startswith("/api/"):

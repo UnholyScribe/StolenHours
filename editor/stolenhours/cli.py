@@ -186,6 +186,19 @@ def cmd_live(args):
         if r.ok:
             _analyze(args, None)
         return
+    if verb == "cam-unlock":
+        far = float(args.args[0]) if args.args else None
+        r = b.cam_unlock(far)
+        print(("OK  " if r.ok else "ERR ") + r.text)
+        return
+    if verb == "cam-lock":
+        r = b.cam_lock()
+        print(("OK  " if r.ok else "ERR ") + r.text)
+        return
+    if verb == "cam-status":
+        r = b.cam_status()
+        print(("OK  " if r.ok else "ERR ") + r.text)
+        return
     fn = {"ping": lambda: b.ping(), "find": lambda: b.find_prop(args.args[0]),
           "get": lambda: b.get(args.args[0], args.args[1]),
           "set": lambda: b.set(args.args[0], args.args[1], args.args[2]),
@@ -257,9 +270,18 @@ def cmd_gui(args):
     app.main(p, browser=args.browser, port=args.port)
 
 
+def cmd_survey(args):
+    from . import survey_math
+    if args.verb == "root":
+        print(survey_math.survey_root())
+        return
+    info = survey_math.export_all(Path(args.save) if getattr(args, "save", None) else None)
+    print(json.dumps(info, indent=2))
+
+
 def cmd_build_ui(args):
-    from . import (avatar3d, collection, companions, forge, island, mapevents, mapview, skillboard,
-                   uiassets)
+    from . import (avatar3d, collection, companions, craft3d, forge, island, map3d, mapevents, mapview,
+                   skillboard, uiassets, village)
     uiassets.extract(force=args.force)
     uiassets.build()
     avatar3d.extract(force=args.force)
@@ -278,6 +300,12 @@ def cmd_build_ui(args):
     island.build()
     companions.extract(force=args.force)
     companions.build()
+    village.extract(force=args.force)
+    village.build()
+    craft3d.extract(force=args.force)
+    craft3d.build()
+    map3d.extract(force=args.force)
+    map3d.build()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -317,7 +345,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("backup", help="back up the save with SHA-256"); p.add_argument("--reason", default="manual"); p.set_defaults(fn=cmd_backup)
     p = sub.add_parser("restore", help="restore a backup .bin over the save"); p.add_argument("backup_file"); p.set_defaults(fn=cmd_restore)
     p = sub.add_parser("live", help="Mode B: talk to the in-game mod")
-    p.add_argument("verb", choices=["status", "ping", "find", "get", "set", "props", "dump", "dump-all"])
+    p.add_argument("verb", choices=[
+        "status", "ping", "find", "get", "set", "props", "dump", "dump-all",
+        "cam-unlock", "cam-lock", "cam-status",
+    ])
     p.add_argument("args", nargs="*")
     p.set_defaults(fn=cmd_live)
     p = sub.add_parser("analyze-dump", help="cross-reference a live value dump with the save")
@@ -339,6 +370,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("build-ui", help="extract the game's UI art and fonts for the editor (read-only on the game)")
     p.add_argument("--force", action="store_true", help="re-extract even if files exist")
     p.set_defaults(fn=cmd_build_ui)
+    p = sub.add_parser("survey", help="Base Camp survey math (10m grid + objects.json for UE Math Worker)")
+    p.add_argument("verb", choices=["export", "root"], nargs="?", default="export")
+    p.set_defaults(fn=cmd_survey)
     return ap
 
 

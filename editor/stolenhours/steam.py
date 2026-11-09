@@ -201,27 +201,96 @@ def _login_users(steam_root: Path) -> dict[str, tuple[str | None, bool]]:
     return out
 
 
+def _saves_under_userdata(ud: Path, users: dict[str, tuple[str | None, bool]] | None = None) -> list[SaveLocation]:
+    found: list[SaveLocation] = []
+    if not ud.is_dir():
+        return found
+    users = users or {}
+    try:
+        accounts = list(ud.iterdir())
+    except OSError:
+        return found
+    for acct in accounts:
+        if not acct.is_dir() or not acct.name.isdigit():
+            continue
+        remote = acct / APP_ID / "remote"
+        if not remote.is_dir():
+            continue
+        persona, recent = users.get(acct.name, (None, False))
+        try:
+            files = list(remote.glob(SAVE_GLOB))
+        except OSError:
+            continue
+        for f in files:
+            try:
+                mtime = f.stat().st_mtime
+            except OSError:
+                mtime = 0.0
+            found.append(SaveLocation(f, "steam", acct.name, persona, recent, mtime))
+    return found
+
+
+def _deep_steam_userdata() -> list[Path]:
+    """When registry Steam is missing/wrong, still find userdata/*/2993780/remote on common layouts."""
+    out: list[Path] = []
+    seen: set[str] = set()
+
+    def add(p: Path) -> None:
+        try:
+            r = p.resolve()
+        except OSError:
+            return
+        key = str(r).lower()
+        if key not in seen and r.is_dir():
+            seen.add(key)
+            out.append(r)
+
+    for root in find_steam_roots():
+        add(root / "userdata")
+    for d in _drives():
+        for c in _COMMON_STEAM:
+            add(d / c / "userdata")
+        # Portable / renamed Steam folders people actually use
+        for name in ("Steam", "steam", "SteamLibrary"):
+            add(d / name / "userdata")
+            add(d / "Games" / name / "userdata")
+            add(d / "Program Files (x86)" / name / "userdata")
+            add(d / "Program Files" / name / "userdata")
+    return out
+
+
 def find_saves() -> list[SaveLocation]:
     """All gamedata saves, best guess first: newest-login Steam account, then newest file."""
     found: list[SaveLocation] = []
+    seen: set[str] = set()
+
+    def add_all(items: list[SaveLocation]) -> None:
+        for s in items:
+            key = str(s.path).lower()
+            if key not in seen:
+                seen.add(key)
+                found.append(s)
+
     for root in find_steam_roots():
-        users = _login_users(root)
-        ud = root / "userdata"
-        if not ud.is_dir():
-            continue
-        for acct in ud.iterdir():
-            remote = acct / APP_ID / "remote"
-            if not remote.is_dir():
-                continue
-            persona, recent = users.get(acct.name, (None, False))
-            for f in remote.glob(SAVE_GLOB):
-                found.append(SaveLocation(f, "steam", acct.name, persona, recent, f.stat().st_mtime))
+        add_all(_saves_under_userdata(root / "userdata", _login_users(root)))
+    if not found:
+        # Registry miss / exotic Steam path — still find the save without env vars or a command.
+        for ud in _deep_steam_userdata():
+            add_all(_saves_under_userdata(ud))
     local = os.environ.get("LOCALAPPDATA")
     if local:
         d = Path(local) / "Game" / "Saved" / "SaveGames"
         if d.is_dir():
-            for f in list(d.glob("*.bin")) + list(d.glob("*.sav")):
-                found.append(SaveLocation(f, "direct-launch", mtime=f.stat().st_mtime))
+            try:
+                bins = list(d.glob("*.bin")) + list(d.glob("*.sav"))
+            except OSError:
+                bins = []
+            for f in bins:
+                try:
+                    mtime = f.stat().st_mtime
+                except OSError:
+                    mtime = 0.0
+                add_all([SaveLocation(f, "direct-launch", mtime=mtime)])
     found.sort(key=lambda s: (s.kind == "steam", s.most_recent_user, s.mtime), reverse=True)
     return found
 

@@ -7,9 +7,11 @@ local LIVE_DIR = (os.getenv("LOCALAPPDATA") or ".") .. "\\StolenHours\\live\\"
 local CMD = LIVE_DIR .. "cmd.txt"
 local ACK = LIVE_DIR .. "ack.txt"
 local HEARTBEAT = LIVE_DIR .. "heartbeat.txt"
-local VERSION = "0.5.0"
+local VERSION = "0.7.0"
 local busy = false
 local Dump = require("stolenhours_dump")
+local Camera = require("stolenhours_camera")
+local Craft = require("stolenhours_craft")
 
 local function split_tabs(s)
     local out = {}
@@ -296,6 +298,51 @@ handlers.DUMP = function()
     return ok1 and ok2, "values " .. r1 .. " | schema " .. r2
 end
 
+-- CAM_UNLOCK [far_cm] : free zoom-out (patches ChaseCamera CameraLenMax/Base). Default 200000 cm.
+handlers.CAM_UNLOCK = function(args)
+    return Camera.enable(args[1])
+end
+
+-- CAM_LOCK : stop re-patching; soft-reset lengths toward craft default (2000).
+handlers.CAM_LOCK = function()
+    return Camera.disable()
+end
+
+-- CAM_LEN <cm> : set length (also enables).
+handlers.CAM_LEN = function(args)
+    local cm = tonumber(args[1] or "")
+    if not cm or cm < 100 then return false, "usage: CAM_LEN <cm>  (e.g. 12000)" end
+    return Camera.enable(cm)
+end
+
+-- CAM_IN / CAM_OUT [big] : step zoom while unlocked
+handlers.CAM_IN = function(args)
+    return Camera.zoom_in(args[1] == "big")
+end
+handlers.CAM_OUT = function(args)
+    return Camera.zoom_out(args[1] == "big")
+end
+
+-- CAM_STATUS : unlocked? last patch report
+handlers.CAM_STATUS = function()
+    return Camera.status()
+end
+
+-- CRAFT_STATUS : layout subsystem + craft-actor count (Customization cam present?)
+handlers.CRAFT_STATUS = function()
+    return Craft.status()
+end
+
+-- CRAFT_LIST : live placed craft actors (handle + UE cm pose + craftObjId)
+handlers.CRAFT_LIST = function()
+    return Craft.list()
+end
+
+-- CRAFT_TELEPORT <handle> <x> <y> <z> [yaw] : move a live craft actor (save in-game to persist)
+handlers.CRAFT_TELEPORT = function(args)
+    return Craft.teleport(args)
+end
+
 -- Run outside the game thread (UE4SS's own dumpers manage their own threading).
 local async_handlers = {
     DUMP_BUILTIN = function() return Dump.builtin() end,
@@ -334,6 +381,12 @@ local beat = 0
 LoopAsync(200, function()
     beat = beat + 1
     if beat % 5 == 0 then write_file(HEARTBEAT, tostring(os.time())) end
+    -- Re-clamp Max only every ~3s (never force live distance — that caused flicker).
+    if Camera.enabled and beat % 15 == 0 then
+        ExecuteInGameThread(function()
+            pcall(Camera.tick)
+        end)
+    end
     if busy then return false end
     local f = io.open(CMD, "rb")
     if not f then return false end
@@ -356,4 +409,44 @@ RegisterKeyBind(Key.F9, { ModifierKey.CONTROL }, function()
     end)
 end)
 
+local function cam_print(label, ok, res, text)
+    print("[StolenHours] " .. label .. ": " .. tostring(ok and (text or res) or res) .. "\n")
+end
+
+local function toggle_camera()
+    ExecuteInGameThread(function()
+        local ok, res, text
+        if Camera.enabled then
+            ok, res, text = pcall(Camera.disable)
+        else
+            ok, res, text = pcall(Camera.enable)
+        end
+        cam_print("F8", ok, res, text)
+    end)
+end
+
+local function zoom_in(big)
+    ExecuteInGameThread(function()
+        local ok, res, text = pcall(Camera.zoom_in, big)
+        cam_print(big and "F6++" or "F6", ok, res, text)
+    end)
+end
+
+local function zoom_out(big)
+    ExecuteInGameThread(function()
+        local ok, res, text = pcall(Camera.zoom_out, big)
+        cam_print(big and "F7++" or "F7", ok, res, text)
+    end)
+end
+
+-- F8 on/off · F6 zoom in · F7 zoom out (Ctrl = bigger step)
+RegisterKeyBind(Key.F8, toggle_camera)
+RegisterKeyBind(Key.F8, { ModifierKey.CONTROL }, toggle_camera)
+RegisterKeyBind(Key.F6, function() zoom_in(false) end)
+RegisterKeyBind(Key.F7, function() zoom_out(false) end)
+RegisterKeyBind(Key.F6, { ModifierKey.CONTROL }, function() zoom_in(true) end)
+RegisterKeyBind(Key.F7, { ModifierKey.CONTROL }, function() zoom_out(true) end)
+
 print("[StolenHours] live controller " .. VERSION .. " polling " .. LIVE_DIR .. "\n")
+print("[StolenHours] F8=cam on/off  F6=zoom in  F7=zoom out  (Ctrl+F6/F7 = big step)\n")
+print("[StolenHours] CRAFT_STATUS / CRAFT_LIST / CRAFT_TELEPORT (live Customization actors)\n")

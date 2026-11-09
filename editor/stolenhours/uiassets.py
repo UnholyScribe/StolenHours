@@ -103,14 +103,16 @@ ITEM_ICON_PX = 112
 PORTRAIT_PX = 512
 
 
-def _run_extractor(mode: str, pattern: str) -> None:
+def _run_extractor(mode: str, pattern: str, out_dir: Path | None = None) -> None:
     if not EXTRACTOR_DLL.exists():
         subprocess.run(["dotnet", "build", "-c", "Release", "-nologo", "-v", "q"], cwd=EXTRACTOR, check=True)
     from . import rewalk
     key = rewalk.pak_key_path().read_text().strip()
     paks = paths.game_dir() / "Game" / "Content" / "Paks"
+    dest = out_dir or paths.EXTRACT_DIR
+    dest.mkdir(parents=True, exist_ok=True)
     subprocess.run(["dotnet", str(EXTRACTOR_DLL), str(paks), key, str(rewalk.mappings_path()), mode, pattern,
-                    str(paths.EXTRACT_DIR)], check=True)
+                    str(dest)], check=True)
 
 
 def extract(force: bool = False) -> None:

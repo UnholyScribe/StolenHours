@@ -108,3 +108,31 @@ class LiveBridge:
 
     def player(self) -> Reply:
         return self.send("PLAYER", timeout=5)
+
+    def cam_unlock(self, far_cm: float | None = None) -> Reply:
+        if far_cm is None:
+            return self.send("CAM_UNLOCK", timeout=10)
+        return self.send("CAM_UNLOCK", str(int(far_cm)), timeout=10)
+
+    def cam_lock(self) -> Reply:
+        return self.send("CAM_LOCK", timeout=10)
+
+    def cam_status(self) -> Reply:
+        return self.send("CAM_STATUS", timeout=5)
+
+    def craft_status(self) -> Reply:
+        return self.send("CRAFT_STATUS", timeout=10)
+
+    def craft_list(self) -> Reply:
+        return self.send("CRAFT_LIST", timeout=30)
+
+    def craft_teleport(self, handle: int, x: float, y: float, z: float, yaw: float = 0.0) -> Reply:
+        return self.send(
+            "CRAFT_TELEPORT",
+            str(int(handle)),
+            str(float(x)),
+            str(float(y)),
+            str(float(z)),
+            str(float(yaw)),
+            timeout=15,
+        )

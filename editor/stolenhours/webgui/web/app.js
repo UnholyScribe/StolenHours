@@ -91,8 +91,20 @@ async function initTitle() {
   sel.innerHTML = saves.map((p) => `<option value="${h(p)}">${h(shortPath(p))}</option>`).join("") +
     `<option value="__custom">Other file...</option>`;
   $("#title-note").textContent = saves.length ? `${saves.length} save(s) found automatically.` :
-    "No save found automatically. Choose Other file and paste the path to gamedata.bin.";
-  if (!S.state.assets) $("#title-note").textContent += "  Game art not built yet: run  py -3.12 -m stolenhours build-ui";
+    "No save found automatically. Choose Other file… to browse to your gamedata.bin (Steam\\userdata\\…\\2993780\\remote\\). Play once and save in-game if that folder is empty.";
+  if (!S.state.assets) $("#title-note").textContent += "  (Cosmetic art pack missing — editor still works.)";
+  if (window.Music) {
+    await Music.load();
+    Music.bind();
+    // Browsers need a gesture. Skip the Music button (it handles itself) so we don't
+    // start then immediately mute on the same click.
+    const kick = (ev) => {
+      if (ev.target.closest?.("[data-music-toggle]")) return;
+      Music.start();
+      document.removeEventListener("pointerdown", kick, true);
+    };
+    document.addEventListener("pointerdown", kick, true);
+  }
   $("#start-btn").onclick = startGame;
 }
 function shortPath(p) {
@@ -102,9 +114,17 @@ function shortPath(p) {
 async function startGame() {
   let path = $("#save-select").value;
   if (path === "__custom") {
-    path = prompt("Full path to the save (gamedata.bin):") || "";
+    const picked = await attempt(() => api("pick", { mode: "open" }));
+    if (!picked) return;
+    if (picked.path) path = picked.path;
+    else if (picked.manual) {
+      path = prompt("Full path to the save (gamedata.bin):") || "";
+    } else {
+      return;
+    }
     if (!path) return;
   }
+  if (window.Music) Music.start();
   const st = await attempt(() => api("state"));
   const keep = st && st.loaded && st.dirty && (!path || st.path === path);
   const sum = await busy("Opening your save...", () => attempt(() => (keep ? api("summary") : api("load", { path }))));
@@ -112,6 +132,7 @@ async function startGame() {
   S.sum = sum; S.ev = null;
   document.body.classList.add("in-menu");
   $("#menu").hidden = false;
+  if (window.Music) Music.bind();
   show("overview");
   status(`Loaded ${shortPath(sum.path)}. Decrypt, parse and repack all checked byte-exact.`);
   poll();
@@ -954,30 +975,41 @@ const LM_STEPS = [["small", "s"], ["Medium", "m"], ["large", "l"]];
 const LM_POLL_MS = 1500;
 const LM_PHASE = { 1: "On the map", 2: "In progress", 3: "Second phase", open: "Open" };
 function lmStop() { clearTimeout(S.lmTimer); S.lmTimer = null; }
-// StolenHours mod shipped inside the editor: status + install/update into this PC's game (UE4SS must be there)
+// Live Map needs UE4SS + StolenHours mod. Portable build can install both in one click.
 async function modBox(box) {
   const st = await attempt(() => api("mod_status"));
   if (!st || !box.isConnected) return;
   const line = !st.game ? "Fantasy Life i wasn't found on this PC."
-    : !st.ue4ss ? "UE4SS isn't installed in the game folder. Install UE4SS first; the editor then adds its own mod."
-    : st.current ? `Installed and up to date (${h(st.installed)}).`
+    : !st.ue4ss && st.ue4ss_bundled ? "Live Map needs a one-time setup in the game folder (UE4SS + StolenHours mod). Close the game, then press the button."
+    : !st.ue4ss ? "UE4SS isn't in the game folder and this build doesn't ship it. Install UE4SS, then come back."
+    : st.current ? `Live setup ready (${h(st.installed)}). Start the game, load a save, and this map lights up.`
     : st.installed ? `Installed: ${h(st.installed)}${st.enabled ? "" : " (switched off)"}. This editor has ${h(st.bundled)}.`
-    : `Not installed. This editor has ${h(st.bundled)}.`;
-  const can = st.ue4ss && !st.current;
+    : `UE4SS is present; StolenHours mod ${h(st.bundled)} is not installed yet.`;
+  const label = !st.ue4ss && st.ue4ss_bundled ? "Install Live setup"
+    : st.installed ? "Update mod" : "Install mod";
+  const can = st.can_live_setup || (st.ue4ss && !st.current);
   box.innerHTML = `<div class="muted">${line}</div>${can ? `<div class="quick">
-    <button class="btn btn-green btn-small" id="mod-install">${st.installed ? "Update mod" : "Install mod"}</button></div>` : ""}`;
+    <button class="btn btn-green btn-small" id="mod-install">${label}</button></div>` : ""}`;
   const b = $("#mod-install", box);
   if (b) b.onclick = async () => {
-    if (S.state?.game_running) { dialog("Close the game first", "The mod can only be installed while Fantasy Life i is closed."); return; }
-    if (!(await confirmDlg("Install the StolenHours mod?", `Copy the StolenHours mod ${st.bundled} into the game's UE4SS Mods folder and switch it on? Any existing copy is backed up first.`))) return;
-    const r = await busy("Installing the mod...", () => attempt(() => api("mod_install")));
-    if (r) toast(`StolenHours mod ${r.installed} installed. Start the game to use it`);
+    if (S.state?.game_running) { dialog("Close the game first", "Live setup can only run while Fantasy Life i is closed."); return; }
+    const full = !st.ue4ss && st.ue4ss_bundled;
+    const ok = await confirmDlg(full ? "Install Live setup?" : "Install the StolenHours mod?",
+      full
+        ? "This copies UE4SS + the StolenHours mod into your game folder and skips Easy Anti-Cheat for Steam launches (needed for Live Map). Multiplayer stays off until you uninstall. Backups are made first."
+        : `Copy the StolenHours mod ${st.bundled} into the game's UE4SS Mods folder and switch it on? Any existing copy is backed up first.`);
+    if (!ok) return;
+    const r = await busy(full ? "Installing Live setup..." : "Installing the mod...",
+      () => attempt(() => api(full ? "mod_install_live" : "mod_install")));
+    if (r) toast(full
+      ? "Live setup done. Start the game from Steam, load a save, then reopen Live Map."
+      : `StolenHours mod ${r.installed} installed. Start the game to use it`);
     modBox(box);
   };
 }
 async function vLiveMap() {
   if (!S.lmMeta?.maps) {
-    try { S.lmMeta = await (await fetch("game/mapview/mapview.json", { cache: "no-cache" })).json(); if (!S.lmMeta.maps) throw 0; }
+    try { S.lmMeta = await (await fetch("game/mapview/mapview.json", { cache: "no-store" })).json(); if (!S.lmMeta.maps) throw 0; }
     catch { $("#view").innerHTML = `<div class="view panel"><div class="pad"><div class="band"><span>Live Map</span></div>
       <div class="note">Live map not built yet: run  py -3.12 -m stolenhours build-ui</div></div></div>`; return; }
   }
@@ -1218,7 +1250,7 @@ function lmStatus() {
   const L = S.lmLive || {};
   const veil = $("#lm-veil");
   const msg = L.needs_update ? "The installed StolenHours mod is older than the live map. Close the game, press Update mod on the right, then start the game again."
-    : !L.mod && !L.game ? "Game not running: showing the map's places. Start the game to see map events and where you are."
+    : !L.mod && !L.game ? "Live Map needs the game running (with the StolenHours mod). Right now you're seeing place names only — start Fantasy Life i and load a save to see events and your position. Save writing stays locked while the game is open."
     : !L.mod ? "The game is running but the StolenHours mod isn't answering. Load your save; if it still doesn't answer, close the game and install the mod (right)."
     : !L.events ? "Waiting for the game..." : "";
   veil.hidden = !msg;
@@ -1293,8 +1325,10 @@ function vLive() {
   $("#live-probe").onclick = () => liveCall("probe_events", "", "probe map events");
 }
 
-// ---------- Island: debris, terrain, buddies ----------
-const ISL_TABS = [["debris", "Debris"], ["terrain", "Terrain"], ["buddies", "Buddies"]];
+// ---------- Island: debris, terrain, village, house, buddies ----------
+const ISL_TABS = [
+  ["debris", "Debris"], ["terrain", "Terrain"], ["village", "Village"], ["house", "House"], ["buddies", "Buddies"],
+];
 const ISL_GROUPS = {
   base: "Base Camp", depths_b1: "Depths – B1", depths_b2: "Depths – B2", depths_b3: "Depths – B3", other: "Other",
 };
@@ -1312,22 +1346,64 @@ async function vIsland() {
   S.islTab ||= "debris";
   S.islGroup ||= "base";
   S.islQ ||= "";
+  S.vilFree = S.vilFree === true;
   drawIsland();
 }
 function drawIsland() {
   const t = S.islTab;
+  const wide = t === "village" || t === "house" || t === "terrain";
   $("#view").innerHTML = `
-  <div class="view cols" style="grid-template-columns: minmax(0, 1fr) 320px">
+  <div class="view cols" style="grid-template-columns: minmax(0, 1fr) ${wide ? "300px" : "320px"}">
     <div class="panel" style="display:flex;flex-direction:column;min-height:0;padding:0 18px 14px">
       <div class="band"><span>Island</span></div>
       <div class="tabs">${ISL_TABS.map(([k, label]) =>
         `<button class="tab ${t === k ? "active" : ""}" data-isltab="${k}">${label}</button>`).join("")}</div>
-      <div id="isl-body" class="col-body"></div>
+      <div id="isl-body" class="col-body" style="${wide ? "display:flex;flex-direction:column;min-height:0;flex:1" : ""}"></div>
     </div>
     <div class="panel scroll"><div class="pad" id="isl-side"></div></div>
   </div>`;
   $$("[data-isltab]").forEach((b) => (b.onclick = () => { S.islTab = b.dataset.isltab; S.islQ = ""; drawIsland(); }));
-  ({ debris: islDebris, terrain: islTerrain, buddies: islBuddies })[t]();
+  ({ debris: islDebris, terrain: islTerrain, village: islVillage, house: islHouse, buddies: islBuddies })[t]();
+}
+/** Three.js indoor hit (x,y = Three X/Z ×100) → UE Location for My House craft grid. */
+function vilIndoorLoc(v, placed, x, y) {
+  const cell = v.area?.voxel?.[0] || 50;
+  const aw = v.area?.width || 12, ad = v.area?.depth || 12;
+  const ux = Math.max(1, aw - 1), uy = Math.max(1, ad - 1);
+  // Match village3d indoor: Three X ← −iy (high iy = left), Three Z ← ix (0 = back).
+  const ix = Math.max(0, Math.min(ux - 1, Math.floor((y + (ux * cell) / 2) / cell)));
+  const iy = Math.max(0, Math.min(uy - 1, Math.floor((-x + (uy * cell) / 2) / cell)));
+  let ox = -250, oy = -250, oz = 0;
+  if (placed?.length) {
+    const p = placed[0];
+    const rem = (p.gridIdx || 0) % (aw * ad);
+    const pix = Math.floor(rem / aw), piy = rem % aw;
+    ox = p.location[0] - pix * cell;
+    oy = p.location[1] - piy * cell;
+    oz = p.location[2] || 0;
+  }
+  return [ox + ix * cell, oy + iy * cell, oz];
+}
+async function vilEdit(action, args = {}) {
+  // Live + game running: move actors in Customization only (disk save is locked). Persist in-game.
+  const liveMove = action === "move" && S.state?.mod_alive && S.state?.game_running
+    && args.handle != null && args.location;
+  if (liveMove) {
+    const loc = args.location;
+    const yaw = (args.rotation && args.rotation[1]) || 0;
+    const lr = await attempt(() => api("village_live", {
+      action: "teleport", handle: args.handle, location: loc, yaw,
+    }));
+    toast(lr?.ok ? "Moved in-game — Save in Customization to keep it" : (lr?.text || "Live move failed"));
+    return;
+  }
+  const r = await attempt(() => api("village_edit", { action, free: !!S.vilFree, ...args }));
+  if (!r) return;
+  if ((r.village?.mapId === "Map_MyHouse") || args.kind === "indoor") S.vilH = r.village;
+  else S.vil = r.village;
+  S.islKeep = true;
+  afterEdit(r.summary, r.note.charAt(0).toUpperCase() + r.note.slice(1));
+  drawIsland();
 }
 async function islEdit(action, args = {}) {
   const r = await attempt(() => api("island_edit", { action, ...args }));
@@ -1399,28 +1475,759 @@ function islDebris() {
       islEdit("clear_all");
   };
 }
-function islTerrain() {
+async function islTerrain() {
+  const mapId = "Map_000100";
+  S.terrainTool ||= "raise";
+  S.terrainCamKept = S.terrainCamKept === true;
   const t = S.isl.terrain || {};
+  // Load height field once per visit (refresh after paint).
+  if (!S.terrainGrid || S.terrainGrid.mapId !== mapId || !S.islKeep) {
+    const g = await attempt(() => api("village_terrain", { map_id: mapId }));
+    if (!g || S.view !== "island" || S.islTab !== "terrain") return;
+    S.terrainGrid = g;
+  }
+  if (!S.vilMapMeta) {
+    try {
+      const meta = await (await fetch("game/mapview/mapview.json", { cache: "no-store" })).json();
+      S.vilMapMeta = (meta.maps || []).find((m) => m.id === mapId) || null;
+    } catch { S.vilMapMeta = null; }
+  }
+  const bounds = S.vilMapMeta?.bounds || { minX: -17000, maxX: 17000, minY: -17000, maxY: 17000 };
+  const art = S.vilMapMeta?.art ? `game/mapview/${S.vilMapMeta.art}` : "game/mapview/maps/Map_000100.jpg";
+  const g = S.terrainGrid;
+  const raised = (g.cells || []).filter((c) => c.h > 0).length;
+  const waterN = (g.cells || []).filter((c) => c.surface === "water").length;
+
   $("#isl-body").innerHTML = `
-    <div class="note">The save stores Base Camp as a voxel craft grid. Raised / lowered cells use the craft object's
-      <b>Shave</b> bit on <code>land_obj</code> / <code>water_obj</code>. Full raise/lower painting is next; for now you
-      can see the counts and undo every Shave edit.</div>
-    <div class="it-stat"><span>Land cells</span><b>${fmt(t.land)} (${fmt(t.shavedLand)} shaved)</b></div>
-    <div class="it-stat"><span>Water cells</span><b>${fmt(t.water)} (${fmt(t.shavedWater)} shaved)</b></div>
-    <div class="it-stat"><span>Other shaved</span><b>${fmt(t.otherShave)}</b></div>
-    <div class="it-stat"><span>Total Shave flags</span><b>${fmt(t.shaved)}</b></div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn btn-cream" id="isl-reset-shave" ${t.shaved ? "" : "disabled"}>Reset all Shave flags</button>
-    </div>`;
+    <div class="row col-filters" style="flex-wrap:wrap">
+      <button class="tab ${S.terrainTool === "raise" ? "active" : ""}" data-ttool="raise">Raise Ground</button>
+      <button class="tab ${S.terrainTool === "lower" ? "active" : ""}" data-ttool="lower">Lower Ground</button>
+      <button class="tab ${S.terrainTool === "level" ? "active" : ""}" data-ttool="level">Level / Smooth</button>
+      <button class="btn btn-cream btn-small" id="vil-cam-reset">Reset cam</button>
+      <button class="btn btn-cream btn-small" id="vil-refresh">Reload</button>
+    </div>
+    <div class="vil-3d" id="vil-3d">${vilOutdoorHud("Base Camp · Terrain")}</div>
+    <div class="note" style="margin-top:6px">Click a tile to ${
+      S.terrainTool === "lower" ? "lower" : S.terrainTool === "level" ? "level toward neighbors" : "raise"
+    } it.
+      Procedural mesh from <code>land_obj</code>/<code>water_obj</code> height tiers (even cells).
+      Writes the save — check in game (semantics UNVERIFIED).</div>`;
+
   $("#isl-side").innerHTML = `
     <div class="band"><span>Terraforming</span></div>
-    <div class="note">UNVERIFIED: whether Shave means raised, lowered, or flattened versus the default height map.
-      Reset is for undoing editor experiments. Check one cell in game after a reset.</div>`;
+    <div class="it-stat"><span>Grid</span><b>${g.width || 0}×${g.depth || 0}</b></div>
+    <div class="it-stat"><span>Raised cells</span><b>${fmt(raised)}</b></div>
+    <div class="it-stat"><span>Water cells</span><b>${fmt(waterN)}</b></div>
+    <div class="it-stat"><span>Land objs</span><b>${fmt(t.land)} (${fmt(t.shavedLand)} shaved)</b></div>
+    <div class="it-stat"><span>Water objs</span><b>${fmt(t.water)}</b></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-cream" id="isl-reset-shave" ${t.shaved ? "" : "disabled"}>Reset all Shave flags</button>
+    </div>
+    <div class="note" style="margin-top:10px">Default ground is tier 0 (Y=0). Each raise stacks a
+      <code>land_obj</code> (+1.5 m). Lower removes the top tier; at ground, land becomes water.</div>`;
+
+  $$("[data-ttool]").forEach((b) => (b.onclick = () => {
+    S.terrainTool = b.dataset.ttool;
+    if (window.Village3D) window.Village3D.setTerrainTool(S.terrainTool);
+    drawIsland();
+  }));
   $("#isl-reset-shave").onclick = async () => {
     if (await confirmDlg("Reset terrain Shave flags?", `Clear the Shave bit on ${fmt(t.shaved)} cell(s)?`))
       islEdit("reset_shave");
   };
+  $("#vil-refresh").onclick = () => {
+    vilHardReload();
+    drawIsland();
+  };
+  $("#vil-cam-reset").onclick = () => { S.terrainCamKept = false; showTerrain3d(false); };
+
+  const host = $("#vil-3d");
+  const showTerrain3d = async (keep) => {
+    if (!window.Village3D) {
+      host.innerHTML = `<div class="muted" style="padding:20px">Loading 3D…</div>`;
+      await new Promise((r) => window.addEventListener("village3d-ready", r, { once: true }));
+    }
+    // Fetch placed houses so they sit on the new mesh for context.
+    let placed = [];
+    if (!S.vil || S.vil.mapId !== mapId) {
+      const v = await attempt(() => api("village", { map_id: mapId, kind: "map" }));
+      if (v) S.vil = v;
+    }
+    placed = (S.vil?.placed || []).filter((p) => p.category !== "LAND" && p.category !== "WEED");
+    await window.Village3D.show(host, placed, {
+      mode: "outdoor",
+      area: S.vil?.area,
+      bounds,
+      mapArt: art,
+      terrain: S.terrainGrid,
+      terrainTool: S.terrainTool,
+      keepCamera: keep || S.terrainCamKept,
+      onTerrainPaint: async ({ ix, iy, mode: tool }) => {
+        const action = tool === "lower" ? "terrain_lower"
+          : tool === "level" ? "terrain_level" : "terrain_raise";
+        const r = await attempt(() => api("village_edit", { action, map_id: mapId, ix, iy, kind: "map" }));
+        if (!r) return;
+        if (r.terrain) {
+          S.terrainGrid = r.terrain;
+          window.Village3D.rebuildCraftTerrain(r.terrain);
+        }
+        if (r.village) S.vil = r.village;
+        if (r.summary) S.sum = r.summary;
+        S.islKeep = true;
+        // Don't call afterEdit/render — that would rebuild the whole 3D view mid-stroke.
+        status("Unsaved changes. Use Save to file when the game is closed.", true);
+        if (r.note) toast(`${r.note.charAt(0).toUpperCase() + r.note.slice(1)}. Not in your save yet: press Save to file.`);
+        const tg = S.terrainGrid;
+        const raised2 = (tg.cells || []).filter((c) => c.h > 0).length;
+        const water2 = (tg.cells || []).filter((c) => c.surface === "water").length;
+        const side = $("#isl-side");
+        if (side) {
+          const raisedEl = side.querySelectorAll(".it-stat b");
+          if (raisedEl[1]) raisedEl[1].textContent = fmt(raised2);
+          if (raisedEl[2]) raisedEl[2].textContent = fmt(water2);
+        }
+      },
+    });
+    if (!host.querySelector(".vil-hud")) {
+      host.insertAdjacentHTML("afterbegin", vilOutdoorHud("Base Camp · Terrain"));
+    }
+    S.terrainCamKept = true;
+  };
+  showTerrain3d(false);
 }
+/** HUD + compass rose for outdoor Village (N/−Z=−UE_X · E/+X=−UE_Y · S/+Z=+UE_X · W/−X). */
+function vilOutdoorHud(label) {
+  return `<div class="vil-hud"><span class="vil-hud-label">${label}</span></div>
+    <div class="vil-compass" title="Game axes: N = −Z · E = +X · S = +Z · W = −X">
+      <div class="vil-compass-rose">
+        <span class="n">N</span><span class="e">E</span><span class="s">S</span><span class="w">W</span>
+        <i class="needle"></i>
+      </div>
+    </div>`;
+}
+
+function vilHardReload() {
+  if (window.Village3D?.hardReset) window.Village3D.hardReset();
+  S.islKeep = false;
+  S.vil = null;
+  S.craftCat = null;
+  S.terrainGrid = null;
+  S.vilCamKept = false;
+  S.terrainCamKept = false;
+  S.vilMapMeta = null;
+}
+
+function vilModeToggleHtml() {
+  return `<label class="vil-mode" title="Legal uses invCraft stock; Free places any catalog item">
+    <span class="${S.vilFree ? "" : "on"}">Legal</span>
+    <button type="button" class="vil-toggle ${S.vilFree ? "free" : ""}" id="vil-free" aria-pressed="${S.vilFree}">
+      <span class="knob"></span></button>
+    <span class="${S.vilFree ? "on" : ""}">Free</span></label>`;
+}
+function vilBindMode(redraw) {
+  $("#vil-free").onclick = () => { S.vilFree = !S.vilFree; redraw(); };
+}
+function vilWorldToUv(x, y, bounds) {
+  const rx = bounds.maxX - bounds.minX, ry = bounds.maxY - bounds.minY;
+  return { u: (bounds.maxY - y) / ry, v: (x - bounds.minX) / rx };
+}
+function vilUvToWorld(u, v, bounds) {
+  const rx = bounds.maxX - bounds.minX, ry = bounds.maxY - bounds.minY;
+  return { x: bounds.minX + v * rx, y: bounds.maxY - u * ry };
+}
+async function loadCraftCatalog() {
+  if (S.craftCat) return S.craftCat;
+  try {
+    const j = await (await fetch("game/village/craft.json", { cache: "no-store" })).json();
+    S.craftCat = { objects: j.objects || [], houses: j.houses || [] };
+  } catch {
+    S.craftCat = { objects: [], houses: [] };
+  }
+  return S.craftCat;
+}
+function vilCatRows(items, stock, placeId, limit = 200) {
+  return items.slice(0, limit).map((c) => {
+    const own = c.itemId && stock[c.itemId] ? stock[c.itemId] : 0;
+    const on = placeId === c.id ? "on" : "";
+    const icon = c.itemId ? `game/items/${h(c.itemId)}.png` : "";
+    return `<button class="vil-cat-row ${on}" data-place="${h(c.id)}" title="${h(c.id)}">
+      ${icon ? `<img src="${icon}" alt="" onerror="this.remove()">` : ""}
+      <span>${h(c.name)}${!S.vilFree && c.itemId ? ` · ×${own}` : ""}</span></button>`;
+  }).join("") || `<div class="muted">No matches.</div>`;
+}
+function vilApplyCam(world) {
+  const cam = S.vilCam || { scale: 1.6, x: 0, y: 0 };
+  world.style.transform = `translate(calc(-50% + ${cam.x}px), calc(-50% + ${cam.y}px)) scale(${cam.scale})`;
+}
+function vilBindMapCam(stage, world) {
+  S.vilCam ||= { scale: 1.6, x: 0, y: 0 };
+  vilApplyCam(world);
+  stage.classList.toggle("placing", !!S.vilPlaceId);
+  let pan = null;
+  stage.onwheel = (ev) => {
+    ev.preventDefault();
+    const cam = S.vilCam;
+    const before = cam.scale;
+    const factor = ev.deltaY > 0 ? 0.9 : 1.11;
+    cam.scale = Math.min(6, Math.max(0.55, before * factor));
+    // zoom toward cursor
+    const rect = stage.getBoundingClientRect();
+    const cx = ev.clientX - rect.left - rect.width / 2;
+    const cy = ev.clientY - rect.top - rect.height / 2;
+    const k = cam.scale / before;
+    cam.x = cx - (cx - cam.x) * k;
+    cam.y = cy - (cy - cam.y) * k;
+    vilApplyCam(world);
+  };
+  stage.onpointerdown = (ev) => {
+    const panBtn = ev.button === 1 || ev.button === 2 || (ev.button === 0 && !S.vilPlaceId && !ev.target.closest(".vil-fp"));
+    if (!panBtn && ev.button !== 0) return;
+    if (ev.button === 0 && S.vilPlaceId && !ev.target.closest(".vil-fp")) return; // place on click
+    if (ev.button === 2) ev.preventDefault();
+    pan = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, ox: S.vilCam.x, oy: S.vilCam.y, moved: false };
+    stage.setPointerCapture(ev.pointerId);
+    stage.classList.add("panning");
+  };
+  stage.onpointermove = (ev) => {
+    if (!pan || pan.id !== ev.pointerId) return;
+    const dx = ev.clientX - pan.x, dy = ev.clientY - pan.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
+    S.vilCam.x = pan.ox + dx;
+    S.vilCam.y = pan.oy + dy;
+    vilApplyCam(world);
+  };
+  const endPan = (ev) => {
+    if (!pan || pan.id !== ev.pointerId) return;
+    const wasDrag = pan.moved;
+    pan = null;
+    stage.classList.remove("panning");
+    stage._vilDragged = wasDrag;
+  };
+  stage.onpointerup = endPan;
+  stage.onpointercancel = endPan;
+  stage.oncontextmenu = (ev) => ev.preventDefault();
+}
+
+async function islVillage() {
+  const mapId = "Map_000100";
+  const craft = await loadCraftCatalog();
+  if (!S.vil || S.vil.mapId !== mapId || !S.islKeep) {
+    const v = await attempt(() => api("village", { map_id: mapId, kind: "map" }));
+    if (!v || S.view !== "island" || S.islTab !== "village") return;
+    S.vil = v;
+  }
+  if (!S.vilMapMeta) {
+    try {
+      const meta = await (await fetch("game/mapview/mapview.json", { cache: "no-store" })).json();
+      S.vilMapMeta = (meta.maps || []).find((m) => m.id === mapId) || null;
+    } catch { S.vilMapMeta = null; }
+  }
+  S.vilSel ||= null;
+  S.vilPlaceId ||= "";
+  S.vilCatQ ||= "";
+  S.vilCatTab ||= "build"; // build | houses | placed
+  S.vilCraftMode ||= "craft"; // craft (Customization) | ground
+  S.vilCamKept = S.vilCamKept === true;
+  const v = S.vil, bounds = S.vilMapMeta?.bounds || { minX: -17000, maxX: 17000, minY: -17000, maxY: 17000 };
+  const art = S.vilMapMeta?.art ? `game/mapview/${S.vilMapMeta.art}` : "game/mapview/maps/Map_000100.jpg";
+  const placed = (v.placed || []).filter((p) => p.category !== "LAND");
+  const nameOf = (id) => (craft.objects.find((o) => o.id === id) || {}).name
+    || (craft.houses.find((hh) => hh.id === id || hh.craftObj === id) || {}).name || id;
+  placed.forEach((p) => { if (!p.name || p.name === p.craftObjId) p.name = nameOf(p.craftObjId) || p.name; });
+
+  const placeMeta = () => {
+    if (!S.vilPlaceId) return { w: 1, d: 1 };
+    if (S.vilPlaceId.startsWith("house:")) {
+      const hh = craft.houses.find((x) => x.id === S.vilPlaceId.slice(6));
+      const obj = hh && craft.objects.find((o) => o.id === hh.craftObj);
+      return { w: obj?.w || 8, d: obj?.d || 8 };
+    }
+    const o = craft.objects.find((x) => x.id === S.vilPlaceId) || {};
+    return { w: o.w || 1, d: o.d || 1 };
+  };
+
+  const liveOn = !!S.state?.mod_alive;
+  $("#isl-body").innerHTML = `
+    <div class="vil-craft-bar">
+      <button type="button" class="vil-craft-tab ${S.vilCraftMode === "craft" ? "on" : ""}" data-cmode="craft"
+        title="Customization — place houses & outdoor objects">
+        <span class="ic">🪑</span>Customization</button>
+      <button type="button" class="vil-craft-tab ${S.vilCraftMode === "ground" ? "on" : ""}" data-cmode="ground"
+        title="Ground — terrain raise/lower (Island → Terrain for now)">
+        <span class="ic">🟫</span>Ground</button>
+    </div>
+    <div class="row col-filters" style="flex-wrap:wrap;align-items:center;gap:8px">
+      ${vilModeToggleHtml()}
+      <input id="vil-q" type="search" placeholder="Filter catalog…" value="${h(S.vilCatQ)}" style="flex:1;min-width:120px">
+      <button class="btn btn-cream btn-small" id="vil-cam-reset">Reset cam</button>
+      <button class="btn btn-cream btn-small" id="vil-explore">${S.vilExplore ? "Build view" : "Walk / Explore"}</button>
+      <button class="btn btn-cream btn-small" id="vil-refresh">Reload</button>
+    </div>
+    <div class="note" id="vil-live-banner" style="margin-top:6px;${liveOn ? "border-left:3px solid #3a8;padding-left:8px" : ""}">
+      ${liveOn
+        ? `<b>Live linked</b> — Fantasy Life is the truth view. Open <b>Customization</b> in-game; this pane is the schematic.
+           <button class="btn btn-green btn-small" id="vil-live-cam" style="margin-left:6px">Unlock craft cam</button>
+           <button class="btn btn-cream btn-small" id="vil-live-status">Craft status</button>
+           <span class="muted" id="vil-live-txt" style="margin-left:6px"></span>`
+        : `Offline schematic. Start the game with the Stolen Hours mod (0.7+) for live Customization + craft cam.`}
+      <div style="margin-top:6px">
+        <b>Survey math</b> — UE 10×10 m grid + door arrows from <code>G:\\Stolen Hours\\survey</code>.
+        <button class="btn btn-cream btn-small" id="vil-survey-refresh" style="margin-left:6px">Refresh survey</button>
+        <span class="muted" id="vil-survey-txt" style="margin-left:6px"></span>
+      </div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
+      <input id="vil-preset-name" type="text" placeholder="Loadout name…" value="${h(S.vilPresetName || "")}" style="width:140px">
+      <button class="btn btn-cream btn-small" id="vil-preset-save">Save village loadout</button>
+      <select id="vil-preset-pick" style="min-width:120px"><option value="">Load loadout…</option></select>
+      <button class="btn btn-green btn-small" id="vil-preset-load" disabled>Apply loadout</button>
+      <button class="btn btn-cream btn-small" id="vil-preset-del" disabled>Delete</button>
+    </div>
+    <div class="vil-3d" id="vil-3d">${vilOutdoorHud(`Base Camp · ${S.vilExplore ? "Explore" : "Craft Mode"}`)}</div>
+    <div class="note" style="margin-top:6px">${S.vilExplore
+      ? "WASD / arrows to walk · mouse orbit follow · height snaps to terrain. Toggle Build view to place."
+      : "Float above like in-game Customization. Cyan = valid footprint, red = water/cliff. Drag orbit · scroll zoom · click to place. N/−Z · E/+X · S/+Z · W/−X."
+    }</div>`;
+
+  $$("[data-cmode]").forEach((b) => (b.onclick = () => {
+    if (b.dataset.cmode === "ground") {
+      S.islTab = "terrain";
+      drawIsland();
+      return;
+    }
+    S.vilCraftMode = "craft";
+    drawIsland();
+  }));
+
+  // Outdoor facilities + outdoor OBJECT deco. House kits separate tab.
+  const OUTDOOR = new Set(["BRIDGE", "FENCE", "ROAD", "SLOPE", "GUILD_SQUARE",
+    "GUILD_HOUSE", "PLANNED_CONSTRUCT", "VEGETABLE_FIELD", "PICK", "WEED", "TAMAGEMONO", "OBJECT"]);
+
+  const vilSide = () => {
+    const sel = placed.find((p) => p.handle === S.vilSel);
+    const stock = v.inventory || {};
+    const q = (S.vilCatQ || "").toLowerCase();
+    const onIsland = (v.houses || []).map((hh) => {
+      const meta = craft.houses.find((x) => x.id === hh.id) || {};
+      const fromObj = meta.craftObj ? nameOf(meta.craftObj) : null;
+      return {
+        ...hh,
+        name: (hh.name && !hh.name.startsWith("house_") ? hh.name : null)
+          || meta.name || fromObj || nameOf(hh.id) || hh.id,
+      };
+    });
+    const houseShells = (craft.houses || []).filter((hh) =>
+      !q || hh.name.toLowerCase().includes(q) || hh.id.toLowerCase().includes(q));
+    const buildItems = (craft.objects.length ? craft.objects : (v.catalog || []))
+      .filter((c) => OUTDOOR.has(c.category) && c.category !== "HOUSE")
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+
+    const isleName = S.sum?.island || S.state?.island || "Base Camp";
+    const rank = S.sum?.development_rank ?? S.sum?.devRank;
+    const resN = (S.bud?.residents || []).length;
+    const debrisLeft = S.isl?.remaining;
+    $("#isl-side").innerHTML = `
+      <div class="band"><span>Boyle · Guild desk</span></div>
+      <div class="it-stat"><span>Island</span><b>${h(isleName)}</b></div>
+      ${rank != null ? `<div class="it-stat"><span>Development</span><b>${fmt(rank)}</b></div>` : ""}
+      <div class="it-stat"><span>Residents</span><b>${fmt(resN)}</b></div>
+      ${debrisLeft != null ? `<div class="it-stat"><span>Debris left</span><b>${fmt(debrisLeft)}</b>
+        <button class="btn btn-cream btn-small" id="vil-to-debris" style="margin-left:6px">Clear…</button></div>` : ""}
+      <div class="band" style="margin-top:10px"><span>Cooke · Kits</span></div>
+      <div class="note">Infrastructure kits (bridges, slopes, house kits) come from Cooke in game.
+        Place from the Build / House kits tabs with Legal (consumes bag) or Free. Direct Dosh shop UI next.</div>
+      <div class="band" style="margin-top:10px"><span>Object list</span></div>
+      <div class="note">${placed.length} on island · Legal / Free above. Cyan = valid pad, red = water/cliff.</div>
+      ${sel ? `<div class="band" style="margin-top:10px"><span>Selected</span></div>
+        <div class="it-stat"><span>${h(sel.name)}</span><b>${h(sel.craftObjId)}</b></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">
+          <button class="btn btn-cream btn-small" id="vil-rot">Rotate 90°</button>
+          <button class="btn btn-cream btn-small" id="vil-rm">Remove</button>
+        </div>` : `<div class="muted" style="margin:8px 0">Click a placed object in the 3D view.</div>`}
+      <div class="band" style="margin-top:10px"><span>Houses on island</span></div>
+      <div class="vil-list">${onIsland.length ? onIsland.map((hh) =>
+        `<div class="vil-list-row"><span>${h(hh.name)}</span><small>${h(hh.map || "")}</small></div>`).join("")
+        : `<div class="muted">None yet.</div>`}</div>
+      <div class="row" style="gap:4px;margin:4px 0 8px;flex-wrap:wrap">
+        <button class="tab ${S.vilCatTab === "build" ? "active" : ""}" data-vtab="build">Build</button>
+        <button class="tab ${S.vilCatTab === "houses" ? "active" : ""}" data-vtab="houses">House kits</button>
+        <button class="tab ${S.vilCatTab === "placed" ? "active" : ""}" data-vtab="placed">Placed</button>
+      </div>
+      <div class="vil-cat" id="vil-cat"></div>`;
+
+    const cat = $("#vil-cat");
+    if (S.vilCatTab === "placed") {
+      cat.innerHTML = placed.length ? placed.map((p) =>
+        `<button class="vil-list-row ${S.vilSel === p.handle ? "on" : ""}" data-h="${p.handle}">
+          <span>${h(p.name)}</span><small>${h(p.category || "")}</small></button>`).join("")
+        : `<div class="muted">Nothing placed.</div>`;
+      $$("[data-h]").forEach((b) => (b.onclick = () => {
+        S.vilSel = +b.dataset.h;
+        if (window.Village3D) window.Village3D.highlight(S.vilSel);
+        vilSide();
+      }));
+    } else if (S.vilCatTab === "houses") {
+      cat.innerHTML = houseShells.slice(0, 200).map((hh) => {
+        const pid = `house:${hh.id}`;
+        return `<button class="vil-cat-row ${S.vilPlaceId === pid ? "on" : ""}" data-place="${h(pid)}">
+          <span>${h(hh.name)} <small>${h(hh.structure || "")}</small></span></button>`;
+      }).join("") || `<div class="muted">No house kits (run build-ui).</div>`;
+    } else {
+      cat.innerHTML = vilCatRows(buildItems, stock, S.vilPlaceId, 250);
+    }
+
+    $$("[data-vtab]").forEach((b) => (b.onclick = () => { S.vilCatTab = b.dataset.vtab; vilSide(); }));
+    $$("[data-place]").forEach((b) => (b.onclick = () => {
+      S.vilPlaceId = b.dataset.place;
+      const sz = placeMeta();
+      if (window.Village3D) window.Village3D.setPlaceSize(sz.w, sz.d);
+      vilSide();
+      show3d(true);
+    }));
+    const toDeb = $("#vil-to-debris");
+    if (toDeb) toDeb.onclick = () => { S.islTab = "debris"; drawIsland(); };
+    if (sel) {
+      $("#vil-rot").onclick = () => vilEdit("rotate", { handle: sel.handle, map_id: mapId, kind: "map" });
+      $("#vil-rm").onclick = async () => {
+        if (await confirmDlg("Remove object?", `Remove ${sel.name} from Base Camp?`))
+          vilEdit("remove", { handle: sel.handle, map_id: mapId, kind: "map" });
+      };
+    }
+  };
+
+  const host = $("#vil-3d");
+  const show3d = async (keep) => {
+    if (!window.Village3D) {
+      host.querySelector(".vil-hud") || (host.innerHTML = `<div class="muted" style="padding:20px">Loading 3D…</div>`);
+      await new Promise((r) => window.addEventListener("village3d-ready", r, { once: true }));
+    }
+    // Always refresh the height field so Village is a 3D craft island, not the static map JPG.
+    {
+      const g = await attempt(() => api("village_terrain", { map_id: mapId }));
+      if (g) S.terrainGrid = g;
+    }
+    const sz = placeMeta();
+    const z0 = v.area?.origin?.[2] ?? -150;
+    if (!S.surveyTruth || S.surveyTruthForce) {
+      S.surveyTruth = await attempt(() => api("survey_truth", { refresh: !!S.surveyTruthForce }));
+      S.surveyTruthForce = false;
+    }
+    await window.Village3D.show(host, placed, {
+      mode: "outdoor",
+      area: v.area,
+      bounds,
+      mapArt: art,
+      terrain: S.terrainGrid,
+      residents: S.bud?.residents || [],
+      selected: S.vilSel,
+      placeW: sz.w,
+      placeD: sz.d,
+      keepCamera: keep || S.vilCamKept,
+      surveyTruth: S.surveyTruth,
+      onSelect: (handle) => { S.vilSel = handle; vilSide(); },
+      onPlace: async ({ x, y }) => {
+        if (!S.vilPlaceId) return;
+        const vw = v.area?.voxel?.[0] || 50;
+        const px = Math.round(x / vw) * vw, py = Math.round(y / vw) * vw;
+        if (S.vilPlaceId.startsWith("house:")) {
+          await vilEdit("place_house", { house_id: S.vilPlaceId.slice(6), map_id: mapId,
+            location: [px, py, z0 + 150], kind: "map" });
+        } else {
+          await vilEdit("place", { craft_obj_id: S.vilPlaceId, map_id: mapId,
+            location: [px, py, z0 + 150], kind: "map" });
+        }
+      },
+      onMove: async ({ handle, x, y }) => {
+        const vw = v.area?.voxel?.[0] || 50;
+        const px = Math.round(x / vw) * vw, py = Math.round(y / vw) * vw;
+        vilEdit("move", { handle, map_id: mapId, kind: "map", location: [px, py, z0 + 150] });
+      },
+    });
+    // re-attach hud + compass after Village3D clears host
+    if (!host.querySelector(".vil-hud")) {
+      host.insertAdjacentHTML("afterbegin",
+        vilOutdoorHud(`Base Camp · ${S.vilExplore ? "Explore" : "Craft Mode"}`));
+    }
+    if (window.Village3D?.setExploreMode) window.Village3D.setExploreMode(!!S.vilExplore);
+    const stxt = $("#vil-survey-txt");
+    if (stxt && S.surveyTruth?.ok) {
+      const mism = window.Village3D.surveyYawMismatches?.(10) || [];
+      stxt.textContent = `${S.surveyTruth.cells || 0} cells · ${S.surveyTruth.object_count || 0} objs` +
+        (S.surveyTruth.cells_captured ? ` · ${S.surveyTruth.cells_captured} captured` : "") +
+        (mism.length ? ` · ${mism.length} yaw mismatch(es)` : " · yaw OK");
+      if (mism.length) console.warn("survey yaw mismatches", mism);
+    }
+    S.vilCamKept = true;
+  };
+
+  vilSide();
+  vilBindMode(() => { drawIsland(); });
+  $("#vil-q").oninput = () => { S.vilCatQ = $("#vil-q").value.trim(); vilSide(); };
+  $("#vil-cam-reset").onclick = () => { S.vilCamKept = false; show3d(false); };
+  $("#vil-explore").onclick = () => {
+    S.vilExplore = !S.vilExplore;
+    if (window.Village3D) window.Village3D.setExploreMode(S.vilExplore);
+    const hud = host.querySelector(".vil-hud-label");
+    if (hud) hud.textContent = `Base Camp · ${S.vilExplore ? "Explore" : "Craft Mode"}`;
+    // Avoid full redraw so the walk pose / cam stay put.
+    const btn = $("#vil-explore");
+    if (btn) btn.textContent = S.vilExplore ? "Build view" : "Walk / Explore";
+  };
+  $("#vil-refresh").onclick = async () => {
+    vilHardReload();
+    drawIsland();
+  };
+
+  const liveCam = $("#vil-live-cam");
+  if (liveCam) {
+    liveCam.onclick = async () => {
+      const r = await attempt(() => api("village_live", { action: "cam_unlock" }));
+      const t = $("#vil-live-txt");
+      if (t) t.textContent = r?.text || (r?.ok ? "cam unlocked" : "failed");
+    };
+  }
+  const liveSt = $("#vil-live-status");
+  if (liveSt) {
+    liveSt.onclick = async () => {
+      const r = await attempt(() => api("village_live", { action: "status" }));
+      const t = $("#vil-live-txt");
+      if (t) t.textContent = r?.text || "";
+    };
+  }
+  const surveyBtn = $("#vil-survey-refresh");
+  if (surveyBtn) {
+    surveyBtn.onclick = async () => {
+      S.surveyTruthForce = true;
+      S.surveyTruth = null;
+      const r = await attempt(() => api("survey_truth", { refresh: true }));
+      S.surveyTruth = r;
+      S.surveyTruthForce = false;
+      if (window.Village3D?.setSurveyTruth) window.Village3D.setSurveyTruth(r);
+      const t = $("#vil-survey-txt");
+      if (t && r?.ok) {
+        const mism = window.Village3D.surveyYawMismatches?.(10) || [];
+        t.textContent = `refreshed · ${r.cells} cells · ${r.object_count} objs` +
+          (mism.length ? ` · ${mism.length} yaw mismatch(es)` : " · yaw OK");
+      }
+    };
+  }
+
+  const refreshPresets = async () => {
+    const r = await attempt(() => api("village_presets", { action: "list" }));
+    const sel = $("#vil-preset-pick");
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">Load loadout…</option>` +
+      (r?.presets || []).map((p) =>
+        `<option value="${h(p.name)}">${h(p.name)} (${p.objects || 0} objs)</option>`).join("");
+    if (cur) sel.value = cur;
+    const has = !!sel.value;
+    const loadBtn = $("#vil-preset-load"), delBtn = $("#vil-preset-del");
+    if (loadBtn) loadBtn.disabled = !has;
+    if (delBtn) delBtn.disabled = !has;
+  };
+  await refreshPresets();
+  $("#vil-preset-pick").onchange = () => {
+    const has = !!$("#vil-preset-pick").value;
+    $("#vil-preset-load").disabled = !has;
+    $("#vil-preset-del").disabled = !has;
+  };
+  $("#vil-preset-save").onclick = async () => {
+    const name = ($("#vil-preset-name").value || "").trim() || `village_${new Date().toISOString().slice(0, 10)}`;
+    S.vilPresetName = name;
+    const r = await attempt(() => api("village_presets", {
+      action: "export", name, map_id: mapId, kind: "map", note: "Base Camp loadout",
+    }));
+    if (r) {
+      toast(`Saved loadout “${name}” (${r.objects} objects)`);
+      $("#vil-preset-name").value = name;
+      await refreshPresets();
+      $("#vil-preset-pick").value = name;
+      $("#vil-preset-load").disabled = false;
+      $("#vil-preset-del").disabled = false;
+    }
+  };
+  $("#vil-preset-load").onclick = async () => {
+    const name = $("#vil-preset-pick").value;
+    if (!name) return;
+    if (!(await confirmDlg("Apply village loadout?",
+      `Replace non-house Base Camp objects with “${name}”? Quit the game first. Houses are placed/moved best-effort.`)))
+      return;
+    const r = await attempt(() => api("village_presets", {
+      action: "import", name, free: !!S.vilFree, replace: true,
+    }));
+    if (r) {
+      toast(`Applied “${name}”: removed ${r.removed}, placed ${r.placed}`);
+      S.vil = r.village || null;
+      S.islKeep = false;
+      drawIsland();
+    }
+  };
+  $("#vil-preset-del").onclick = async () => {
+    const name = $("#vil-preset-pick").value;
+    if (!name) return;
+    if (!(await confirmDlg("Delete loadout?", `Delete saved loadout “${name}”?`))) return;
+    await attempt(() => api("village_presets", { action: "delete", name }));
+    await refreshPresets();
+  };
+
+  show3d(false);
+}
+
+async function islHouse() {
+  const mapId = "Map_MyHouse";
+  const craft = await loadCraftCatalog();
+  if (!S.vilH || S.vilH.mapId !== mapId || !S.islKeep) {
+    const v = await attempt(() => api("village", { map_id: mapId, kind: "indoor" }));
+    if (!v || S.view !== "island" || S.islTab !== "house") return;
+    S.vilH = v;
+  }
+  S.vilHSel ||= null;
+  S.vilPlaceId ||= "";
+  S.vilCatQ ||= "";
+  S.vilHTab ||= "furniture"; // furniture | placed | houses
+  const v = S.vilH;
+  const placed = [...(v.placed || [])];
+  const nameOf = (id) => (craft.objects.find((o) => o.id === id) || {}).name
+    || (craft.houses.find((hh) => hh.id === id || hh.craftObj === id) || {}).name || id;
+  placed.forEach((p) => { if (!p.name || p.name === p.craftObjId) p.name = nameOf(p.craftObjId) || p.name; });
+  const FURN = new Set(["OBJECT", "TABLE", "WALLDECO", "RUG", "LUNCH_EATS", "LUNCH_DRINK"]);
+
+  $("#isl-body").innerHTML = `
+    <div class="row col-filters" style="flex-wrap:wrap">
+      ${vilModeToggleHtml()}
+      <input id="vil-q" type="search" placeholder="Filter furniture…" value="${h(S.vilCatQ)}" style="flex:1;min-width:120px">
+      <button class="btn btn-cream btn-small" id="vil-cam-reset">Reset cam</button>
+      <button class="btn btn-cream btn-small" id="vil-refresh">Reload</button>
+    </div>
+    <div class="vil-3d" id="vil-3d" style="background:#1a1008">
+      <div class="vil-hud"><span class="vil-hud-label">My House · Decorate</span></div>
+    </div>
+    <div class="note" style="margin-top:6px">Cutaway room like in-game. Orbit 360° · zoom · cyan tile = place · click furniture to select.</div>`;
+
+  const furnMeta = () => {
+    const o = craft.objects.find((x) => x.id === S.vilPlaceId) || {};
+    return { w: o.w || 1, d: o.d || 1 };
+  };
+
+  const side = () => {
+    const sel = placed.find((p) => p.handle === S.vilHSel);
+    const stock = v.inventory || {};
+    const q = (S.vilCatQ || "").toLowerCase();
+    const furnOrder = { OBJECT: 0, TABLE: 1, RUG: 2, WALLDECO: 3, LUNCH_EATS: 4, LUNCH_DRINK: 5 };
+    const furn = (craft.objects.length ? craft.objects : (v.catalog || []))
+      .filter((c) => FURN.has(c.category))
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
+      .sort((a, b) => (furnOrder[a.category] - furnOrder[b.category]) || a.name.localeCompare(b.name));
+    const onIsland = (v.houses || []).map((hh) => ({
+      ...hh, name: hh.name || nameOf(hh.id) || hh.id,
+    }));
+    const houseKits = (craft.houses || []).filter((hh) =>
+      !q || hh.name.toLowerCase().includes(q) || hh.id.toLowerCase().includes(q));
+
+    $("#isl-side").innerHTML = `
+      <div class="band"><span>Furniture list</span></div>
+      <div class="it-stat"><span>In room</span><b>${placed.length}</b></div>
+      ${sel ? `<div class="band" style="margin-top:10px"><span>Selected</span></div>
+        <div class="it-stat"><span>${h(sel.name)}</span><b>${h(sel.craftObjId)}</b></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;margin:8px 0">
+          <button class="btn btn-cream btn-small" id="vil-rot">Rotate 90°</button>
+          <button class="btn btn-cream btn-small" id="vil-rm">Remove</button>
+        </div>` : `<div class="muted" style="margin:8px 0">Pick from the list, then click a cyan tile in the room.</div>`}
+      <div class="row" style="gap:4px;margin:12px 0 8px;flex-wrap:wrap">
+        <button class="tab ${S.vilHTab === "furniture" ? "active" : ""}" data-htab="furniture">Furniture</button>
+        <button class="tab ${S.vilHTab === "placed" ? "active" : ""}" data-htab="placed">Placed (${placed.length})</button>
+        <button class="tab ${S.vilHTab === "houses" ? "active" : ""}" data-htab="houses">Houses</button>
+      </div>
+      <div class="vil-cat" id="vil-cat"></div>`;
+
+    const cat = $("#vil-cat");
+    if (S.vilHTab === "placed") {
+      cat.innerHTML = placed.length ? placed.map((p) =>
+        `<button class="vil-list-row ${S.vilHSel === p.handle ? "on" : ""}" data-h="${p.handle}">
+          <span>${h(p.name)}</span><small>${h(p.category || "")}</small></button>`).join("")
+        : `<div class="muted">No furniture placed yet.</div>`;
+      $$("[data-h]").forEach((b) => (b.onclick = () => {
+        S.vilHSel = +b.dataset.h;
+        if (window.Village3D) window.Village3D.highlight(S.vilHSel);
+        side();
+      }));
+    } else if (S.vilHTab === "houses") {
+      cat.innerHTML = `
+        <div class="muted" style="padding:4px 0">On your island</div>
+        ${onIsland.length ? onIsland.map((hh) =>
+          `<div class="vil-list-row"><span>${h(hh.name)}</span><small>${h(hh.map || "")}</small></div>`).join("")
+          : `<div class="muted">None.</div>`}
+        <div class="muted" style="padding:8px 0 4px">House kits (place from Village tab)</div>
+        ${houseKits.slice(0, 120).map((hh) =>
+          `<div class="vil-list-row"><span>${h(hh.name)}</span><small>${h(hh.structure || "")}</small></div>`).join("")}`;
+    } else {
+      cat.innerHTML = vilCatRows(furn, stock, S.vilPlaceId, 300);
+      $$("[data-place]").forEach((b) => (b.onclick = () => {
+        S.vilPlaceId = b.dataset.place;
+        const sz = furnMeta();
+        if (window.Village3D) window.Village3D.setPlaceSize(sz.w, sz.d);
+        side();
+        show3d(true);
+      }));
+    }
+
+    $$("[data-htab]").forEach((b) => (b.onclick = () => { S.vilHTab = b.dataset.htab; side(); }));
+    if (sel) {
+      $("#vil-rot").onclick = () => vilEdit("rotate", { handle: sel.handle, map_id: mapId, kind: "indoor" });
+      $("#vil-rm").onclick = async () => {
+        if (await confirmDlg("Remove furniture?", `Remove ${sel.name}?`))
+          vilEdit("remove", { handle: sel.handle, map_id: mapId, kind: "indoor" });
+      };
+    }
+  };
+  side();
+  vilBindMode(() => { drawIsland(); });
+  $("#vil-q").oninput = () => { S.vilCatQ = $("#vil-q").value.trim(); side(); };
+  $("#vil-refresh").onclick = () => {
+    S.islKeep = false; S.vilH = null; S.craftCat = null; S.vilHCamKept = false; drawIsland();
+  };
+  $("#vil-cam-reset").onclick = () => { S.vilHCamKept = false; show3d(false); };
+
+  const host = $("#vil-3d");
+  const show3d = async (keep) => {
+    if (!window.Village3D) {
+      host.innerHTML = `<div class="muted" style="padding:20px">Loading 3D…</div>`;
+      await new Promise((r) => window.addEventListener("village3d-ready", r, { once: true }));
+    }
+    const sz = furnMeta();
+    const origin = v.area?.origin || [0, 0, 0];
+    const vw = (v.area?.width || 12) * (v.area?.voxel?.[0] || 50);
+    const vd = (v.area?.depth || 12) * (v.area?.voxel?.[1] || 50);
+    await window.Village3D.show(host, placed, {
+      mode: "indoor",
+      area: v.area,
+      selected: S.vilHSel,
+      placeW: sz.w,
+      placeD: sz.d,
+      keepCamera: keep || !!S.vilHCamKept,
+      onSelect: (handle) => { S.vilHSel = handle; side(); },
+      onPlace: async ({ x, y }) => {
+        if (!S.vilPlaceId || S.vilPlaceId.startsWith("house:")) return;
+        const loc = vilIndoorLoc(v, placed, x, y);
+        if (!loc) return;
+        vilEdit("place", { craft_obj_id: S.vilPlaceId, map_id: mapId, kind: "indoor", location: loc });
+      },
+      onMove: async ({ handle, x, y }) => {
+        const loc = vilIndoorLoc(v, placed, x, y);
+        if (!loc) return;
+        vilEdit("move", { handle, map_id: mapId, kind: "indoor", location: loc });
+      },
+    });
+    if (!host.querySelector(".vil-hud")) {
+      host.insertAdjacentHTML("afterbegin",
+        `<div class="vil-hud"><span class="vil-hud-label">My House · Decorate</span></div>`);
+    }
+    S.vilHCamKept = true;
+  };
+  show3d(false);
+}
+
 function islBuddies() {
   const b = S.bud, q = S.islQ || "";
   const catalog = [...(b.buddies || []), ...(b.extras || [])]
