@@ -937,7 +937,10 @@ def ensure_assets(log=print) -> None:
     cannot leave the editor stuck on a stale save key.
     """
     try:
-        report = rewalk.ensure_current(auto_fetch=True)
+        # Portable exe never rebuilds UI tables from FLi-FModel — skip the network pull so
+        # offline PCs (or airplane mode) don't sit on a 20s timeout after a Steam update.
+        # Dev tree still refreshes pak/usmap when online.
+        report = rewalk.ensure_current(auto_fetch=not paths.FROZEN)
         if report.get("changed"):
             log(f"game update detected; rewalked in {report.get('seconds', '?')}s "
                 f"(key={'ok' if (report.get('key') or {}).get('ok') else 'failed'})")
