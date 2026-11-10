@@ -21,3 +21,4 @@ Read `README.md`, `docs\FINDINGS.md` and `notes\PROGRESS.md` first. `docs\BLUEPR
 - Unholy launches the game himself.
 - Everything stays local; nothing is pushed online unless Unholy asks.
 - Don't run a file in the same parallel batch as the edit that writes it.
+- Peer **Loom** (`agents\Loom\`, Railroad station Loom) owns engine RE (sandbox + Cipher Bench). Hand Live Map / mailbox engine questions to Loom; Loom does not rewrite Tock's editor without Unholy OK.

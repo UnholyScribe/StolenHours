@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import secrets
 import subprocess
 import threading
@@ -328,6 +329,17 @@ class Backend:
         with self.lock:
             self._need().set_stock(category, int(index), int(stock))
         return self.api_items(category)
+
+    def api_set_gear(self, category: str, index: int, title: int, quality: int = 0,
+                     bonus: int = 0, skills: list | None = None) -> dict:
+        """Bag: rewrite grade/quality/bonus/skills on an existing gear slot (beyond-normal allowed)."""
+        with self.lock:
+            sf = self._need()
+            sf.set_gear(category, int(index), int(title), int(quality or 0), int(bonus or 0),
+                        [str(s) for s in skills or []])
+            items = [self._item(it, sf.inventory[it.category][it.index]) for it in sf.items(category)]
+        row = next((i for i in items if i["index"] == int(index)), None)
+        return {"items": items, "item": row, "summary": self.api_summary()}
 
     def api_add_item(self, category: str, item_id: str, stock: int = 1) -> dict:
         info = self.item_info.get(item_id)
@@ -661,6 +673,9 @@ class Backend:
             elif action == "terrain_level":
                 r = v.terrain_level(sf, int(ix), int(iy), map_id=str(map_id))
                 note = f"leveled terrain ({ix},{iy}) → tier {r.get('h')}"
+            elif action == "terrain_shave":
+                r = v.terrain_shave(sf, int(ix), int(iy), map_id=str(map_id))
+                note = f"{'shaved' if r.get('shave') else 'unshaved'} terrain ({ix},{iy})"
             else:
                 raise ApiError(f"unknown village action {action}")
             st = v.state(sf, map_id=str(map_id), kind=kind)
@@ -669,7 +684,7 @@ class Backend:
                 meta = v.houses.get(hh["id"]) or {}
                 hh["name"] = meta.get("name") or hh.get("id")
             out = {"village": st, "result": r, "note": note, "summary": self.api_summary()}
-            if action in ("terrain_raise", "terrain_lower", "terrain_level"):
+            if action in ("terrain_raise", "terrain_lower", "terrain_level", "terrain_shave"):
                 out["terrain"] = v.terrain_grid(sf, map_id=str(map_id))
             return out
 
@@ -778,16 +793,25 @@ class Backend:
         return modinstall.install_live()
 
     def api_mapview_live(self) -> dict:
-        """Read-only snapshot of the running game for the live map: events in play and the player's position."""
+        """Snapshot of the running game for Live Map: events in play and the player's position."""
         out = {"game": bool(safety.running_game_processes()), "mod": self.bridge.mod_alive(), "events": None, "player": None,
-               "notes": []}
+               "notes": [], "mod_version": None, "control": False}
         if not out["mod"]:
             return out
+        ping = self.bridge.ping()
+        if ping.ok:
+            out["mod_version"] = ping.text
+            # Event control needs StolenHours 0.8.0+ (EVENT_DRAW_UNTIL / EVENT_END / …).
+            vm = re.search(r"StolenHours\s+(\d+)\.(\d+)", ping.text or "")
+            out["control"] = bool(vm and (int(vm.group(1)), int(vm.group(2))) >= (0, 8))
+            if not out["control"] and "StolenHours" in (ping.text or ""):
+                out["notes"].append("Update the StolenHours mod (right) for live event spawn — need 0.8.0+.")
         r = self.bridge.events()
         if r.ok:
             count, _, rest = r.text.partition("|")
             ids, _, notes = rest.partition("|")
-            out["events"] = [{"id": i, "phase": p} for i, _, p in (x.partition(":") for x in ids.split(",") if x)]
+            out["events"] = [{"id": i, "phase": p} for i, _, p in (x.partition(":") for x in ids.split(",") if x)
+                             if i and i != "nil"]
             if notes:
                 out["notes"].append(notes)
         elif r.text.startswith("unknown command"):
@@ -803,6 +827,42 @@ class Backend:
         else:
             out["notes"].append(f"player: {r.text}")
         return out
+
+    def api_mapview_event_control(self, action: str, event_id: str = "", want_id: str = "",
+                                  keep_ids: str = "", max_tries: int = 40, phase: int = 1) -> dict:
+        """Live Active Event control (Loom-proven mailbox verbs). Game + mod 0.8.0+ required."""
+        b = self.bridge
+        if not b.mod_alive():
+            raise ApiError("live mod not running — start the game with StolenHours 0.8.0+")
+        action = (action or "").strip().lower()
+        if action == "end":
+            if not event_id:
+                raise ApiError("event_id required")
+            r = b.event_end(event_id)
+        elif action == "phase":
+            if not event_id:
+                raise ApiError("event_id required")
+            r = b.event_phase(event_id, int(phase))
+        elif action == "swap":
+            if not event_id or not want_id:
+                raise ApiError("event_id (from) and want_id (to) required")
+            r = b.event_swap(event_id, want_id)
+        elif action in ("spawn", "draw_until"):
+            want = want_id or event_id
+            if not want:
+                raise ApiError("want_id required — pick an event to put on the map")
+            keep = (keep_ids or "").strip() or want
+            r = b.event_draw_until(keep, want, int(max_tries) or 40)
+        elif action in ("redraw", "lottery_reset"):
+            r = b.exe_cmd("ExeCmd_LotteryActiveEventToLimitWithReset")
+        elif action in ("refill", "lottery"):
+            r = b.exe_cmd("ExeCmd_LotteryActiveEventToLimit")
+        else:
+            raise ApiError(f"unknown event control action {action}")
+        if r.text.startswith("unknown command"):
+            raise ApiError("mod too old for event control — close the game and Update mod (need 0.8.0+)")
+        snap = self.api_mapview_live()
+        return {"ok": r.ok, "text": r.text, "live": snap}
 
     def api_live(self, action: str, value: str = "") -> dict:
         b = self.bridge

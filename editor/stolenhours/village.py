@@ -208,6 +208,14 @@ def build(out: Path | None = None, log=print) -> dict:
         })
     house_rows.sort(key=lambda h: (h["name"].lower(), h["id"]))
 
+    # Loom Base Camp pack (walls/floors Type 117/118 + landmarks) when banked into UI assets.
+    pack_path = out / "basecamp_pack.json"
+    pack = {}
+    if pack_path.exists():
+        try:
+            pack = json.loads(pack_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pack = {}
     data = {
         "objects": catalog,
         "houses": house_rows,
@@ -215,6 +223,20 @@ def build(out: Path | None = None, log=print) -> dict:
             {"id": MAP_BASE, "name": "Base Camp", "kind": "map"},
             {"id": MAP_MYHOUSE, "name": "My House", "kind": "indoor"},
         ],
+        "wallsFloors": (pack.get("walls_floors") or {}).get("rows") or [],
+        "landmarks": pack.get("landmarks") or {},
+        "terrainOps": pack.get("terrain") or {
+            "voxel_z": 150, "base_z": -150, "shave_mask": 1,
+            "ops": ["hgrm_landPileUp", "hgrm_landDig", "ShaveLand"],
+        },
+        # Loom pack slices (meshes/coverage) — Village UI reads what it needs.
+        "outdoor": pack.get("outdoor") or {},
+        "outdoorCoverage": pack.get("outdoor_coverage") or {},
+        "buildings": pack.get("buildings") or {},
+        "landCells": pack.get("land_cells") or [],
+        "furnitureCoverage": pack.get("furniture_coverage") or {},
+        "indoorParts": pack.get("indoor_parts_meshes") or {},
+        "plannedConstruct": pack.get("planned_construct") or [],
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "craft.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -677,10 +699,9 @@ class Village:
         return {"handle": handle, "rotation": list(o["Rotation"])}
 
     # ---- Base Camp terrain (land_obj / water_obj height field) ---------------
-    # Verified: land_obj/water_obj sit on even (ix,iy) only; iz is the height tier
-    # (voxelHeight 150 cm). Top surface Y (m) = iz * 1.5 with origin Z = −150 →
-    # default ground top at Y=0. Shave bit still UNVERIFIED for raise/lower meaning;
-    # editor raise/lower adds/removes stacked land_obj tiers instead.
+    # Loom CONFIRMED (BASECAMP_SYSTEM / save probe): even (ix,iy) only; iz steps
+    # Location.Z by voxelHeight 150 (Hagram PileUp/Dig). Origin Z ≈ −150 → ground
+    # top Y=0. Shave = objStatusBitFlag bit0 (bevel / Scraped_*); not a height channel.
 
     def terrain_grid(self, sf: SaveFile, map_id: str = MAP_BASE) -> dict:
         """Packed height field for the buildable craft sector."""
@@ -790,7 +811,7 @@ class Village:
         return handle
 
     def terrain_raise(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE) -> dict:
-        """Stack a land_obj one tier above the current top. UNVERIFIED in-game parity."""
+        """Hagram PileUp: stack land_obj one iz (+150 Z). Loom STRONGLY SUPPORTED."""
         list_name, area = self.find_area(sf, map_id, "map")
         origin = self.area_origin(area, sf)
         num_map = self.numeric_map_id(sf, area)
@@ -808,7 +829,7 @@ class Village:
         return {"ix": ix, "iy": iy, "iz": new_iz, "handle": handle, "h": new_iz}
 
     def terrain_lower(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE) -> dict:
-        """Remove the top land/water tier. At ground (iz=0) converts land→water (pit). UNVERIFIED."""
+        """Hagram Dig: remove top tier (−150 Z). At iz=0 land→water. Loom STRONGLY SUPPORTED."""
         list_name, area = self.find_area(sf, map_id, "map")
         layers = self._terrain_layers_at(sf, area, ix, iy)
         if not layers:
@@ -823,6 +844,20 @@ class Village:
             sf.dirty = True
             return {"ix": ix, "iy": iy, "removedIz": 0, "h": 0, "surface": "water"}
         raise SaveFileError("already at water level")
+
+    def terrain_shave(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE,
+                      on: bool | None = None) -> dict:
+        """Toggle Shave bit0 on the top cell (bevel / Scraped_*). Loom CONFIRMED."""
+        list_name, area = self.find_area(sf, map_id, "map")
+        layers = self._terrain_layers_at(sf, area, ix, iy)
+        if not layers:
+            raise SaveFileError(f"no terrain at ({ix},{iy})")
+        top = max(layers, key=lambda L: L["iz"])
+        bit = int(top["obj"].get("objStatusBitFlag") or 0)
+        want = (not bool(bit & 1)) if on is None else bool(on)
+        top["obj"]["objStatusBitFlag"] = (bit | 1) if want else (bit & ~1)
+        sf.dirty = True
+        return {"ix": ix, "iy": iy, "iz": top["iz"], "shave": want, "h": top["iz"]}
 
     def terrain_level(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE) -> dict:
         """Nudge one cell toward the median of its 4-neighbors (Level / Smooth). UNVERIFIED."""

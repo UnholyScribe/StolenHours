@@ -412,6 +412,37 @@ class SaveFile:
         it["stockNum"] = int(stock)
         self.dirty = True
 
+    def set_gear(self, category: str, index: int, title: int, quality: int = 0,
+                 bonus: int = 0, skills: list[str] | tuple = ()) -> None:
+        """Rewrite grade / quality / bonus / skills on an existing gear bag slot.
+
+        Leaves ItemId, handle, getOrder, and equipped alone. Bonus Value stays 0 (game-owned),
+        matching every crafted equip in Unholy's save. Skills pad to the slot's grantSkillId length.
+        """
+        inv = self.inventory[category]
+        if not 0 <= int(index) < len(inv):
+            raise SaveFileError(f"{category} slot {index} out of range")
+        it = inv[int(index)]
+        if it["ItemId"] in EMPTY_IDS:
+            raise SaveFileError("slot is empty")
+        if "itemTitle" not in it:
+            raise SaveFileError(f"{category} items have no grade, quality, bonus stat or skills")
+        skills = [s for s in skills if s and s != "None"]
+        if len(skills) > len(it["grantSkillId"]) or len(set(skills)) != len(skills):
+            raise SaveFileError(f"up to {len(it['grantSkillId'])} different skills")
+        if not 0 <= int(bonus) < EQUIP_STATUS_MAX:
+            raise SaveFileError(f"bonus stat type must be 0..{EQUIP_STATUS_MAX - 1}")
+        title = int(title)
+        if not 0 <= title <= ITEM_TITLE_MAX:
+            raise SaveFileError(f"grade must be 0..{ITEM_TITLE_MAX}")
+        if not 0 <= int(quality) <= ITEM_QUALITY_MAX:
+            raise SaveFileError(f"quality must be 0..{ITEM_QUALITY_MAX}")
+        it["itemTitle"] = title
+        it["Quality"] = int(quality)
+        it["addEquipStatus"] = [{"Type": int(bonus), "Value": 0}]
+        it["grantSkillId"] = skills + ["None"] * (len(it["grantSkillId"]) - len(skills))
+        self.dirty = True
+
     def add_item(self, category: str, item_id: str, stock: int = 1, title: int | None = None,
                  bonus: int = 0, skills: list[str] | tuple = (), quality: int = 0) -> int:
         """Clone the last real item in the category into the first trailing empty slot.

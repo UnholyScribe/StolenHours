@@ -1,5 +1,5 @@
-Stolen Hours — Fantasy Life i save editor
-========================================
+Stolen Hours 0.6.0 — Fantasy Life i save editor
+===============================================
 
 1. Unzip this whole folder somewhere (keep StolenHours.exe next to _internal).
 2. Double-click StolenHours.exe. That is all.
@@ -13,6 +13,11 @@ the editor will open in your normal browser instead.
 
 Live Map / live edits: close the game, open the Live Map tab, press
 "Install Live setup" once, then start the game from Steam and load a save.
+(Event spawn needs the bundled StolenHours mod 0.8.1+.)
+
+Bag: select a weapon, tool, shield, or outfit to edit grade / quality /
+bonus / skills. A warning appears if you go beyond normal craft limits —
+do not use that save online.
 
 If something fails: run StolenHours.exe --check
 Details also go under: %LOCALAPPDATA%\StolenHours\

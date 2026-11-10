@@ -1,5 +1,38 @@
 # Progress
 
+## 2026-11-10: Ship 0.6.0 to GitHub (Tock)
+- Version **0.6.0**: Live Map (map decrypt + AE spawn 0.8.1), Bag beyond-normal gear editor, Base Camp pack
+  pull (cook-absent / fence VPC / shave / outdoor / buildings / land / indoor 307).
+- Portable: `survey_root` no longer prefers `G:\Stolen Hours` — uses exe folder or `%LOCALAPPDATA%\StolenHours\survey`.
+  `portable_check` also flags `G:\Stolen Hours` needles. Live Map / saves / key still Steam-discovered per PC.
+- GitHub release zip + source push (agents/ Loom sandbox stays local / gitignored).
+
+## 2026-11-10: Loom hourly tick — outdoor/buildings/land/indoor parts (Tock)
+- Loom still continuing (cook-absent fallbacks next). Kept 1h loop.
+- Synced `basecamp_pack_index` → `game/village/basecamp_pack.json` + `craft.json`: outdoor
+  BRIDGE/FENCE/SLOPE/ROAD/farm 105, buildings HOUSE 81 + guild 18, LAND pads 14, indoor parts
+  307/307, furniture coverage, planned_construct 10. Copied into running EXE `_internal`.
+
+## 2026-11-10: Early Loom tick — Base Camp pack (Tock)
+- Interrupted ~39m into hour (~21m left); ran early sync; re-armed sleep **1273s** then hourly.
+- Loom Base Camp packs → `game/village/basecamp_pack.json` + craft.json wallsFloors/landmarks.
+- Terrain UI = Hagram Pile Up / Dig / **Shave** (bit0) / Level; Z±150 labeled Loom-proven.
+- House tab: Walls & floors catalog (74 Type 117/118). Apply-to-room write still UNVERIFIED.
+
+## 2026-11-10: Hourly Loom sync + map decryption tick 1 (Tock)
+- Armed 1h wake loop (`AGENT_LOOP_TICK_loom_check`, PID in terminals) — check Loom, implement proven
+  dumps, re-arm until Loom’s map jobs are done (then stop).
+- Applied Loom map scrape: AE icon picker (MAP_SYSTEM), **244** game map icons shipped, **Snoozaland**
+  `Map_200100` (Dream group), Base Camp Dark Don / Bed to Dreams / guide pins, craft-pad HUD crop
+  (`GDSCraftMiniMapSetting` 475×380 @786,832) as Live Map ⚒ toggle. In-game textures only.
+
+## 2026-11-10: Live Map event spawn blueprint (Tock)
+- Wired Loom-proven mailbox verbs into the editor: `EVENT_DRAW_UNTIL` / `EVENT_END` / `EVENT_SWAP` /
+  lottery WithReset via `live.py` + `api_mapview_event_control`.
+- Live Map side panel: control_worthy catalog picker (181 from `game/events/control.json`), Spawn /
+  draw-until, Redraw all, End on each open event. Needs StolenHours mod **0.8.0+**.
+- Live proof on Unholy's running game: spawn Mining Mania (`007_01`) → OK try=5.
+
 ## 2026-11-09: PetDesigner lessons + brother-ready ship (Tock)
 - Read `G:\Archives\petdesigner-book` (NMS techniques). Wrote `research/refs/petdesigner-lessons.md`.
 - Adopted: no-store for JS/JSON/manifests (server + fetches); Look already correct for FLi bone scale

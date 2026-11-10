@@ -109,6 +109,22 @@ class LiveBridge:
     def player(self) -> Reply:
         return self.send("PLAYER", timeout=5)
 
+    def event_end(self, event_id: str) -> Reply:
+        return self.send("EVENT_END", event_id, timeout=20)
+
+    def event_phase(self, event_id: str, phase: int) -> Reply:
+        return self.send("EVENT_PHASE", event_id, str(int(phase)), timeout=15)
+
+    def event_swap(self, from_id: str, to_id: str) -> Reply:
+        return self.send("EVENT_SWAP", from_id, to_id, timeout=45)
+
+    def event_draw_until(self, keep_ids: str, want_id: str, max_tries: int = 40) -> Reply:
+        # keep_ids = comma-separated; use want_id as keep when empty (spawn-until-appears).
+        return self.send("EVENT_DRAW_UNTIL", keep_ids, want_id, str(int(max_tries)), timeout=180)
+
+    def exe_cmd(self, name: str) -> Reply:
+        return self.send("EXE_CMD", name, timeout=30)
+
     def cam_unlock(self, far_cm: float | None = None) -> Reply:
         if far_cm is None:
             return self.send("CAM_UNLOCK", timeout=10)

@@ -1,8 +1,9 @@
 """
 Base Camp survey math worker — named 10 m craft-pad grid + object truth tables.
 
-Runs without Unreal. Writes G:\\Stolen Hours\\survey\\Map_000100\\{grid,objects,axes}.
-UE Editor scripts (tools/SurveyMathWorker/Content/Python) consume the same grid for orbit capture.
+Runs without Unreal. Writes under %LOCALAPPDATA%\\StolenHours\\survey\\Map_000100\\
+(or next to the portable exe when frozen). UE Editor scripts
+(tools/SurveyMathWorker/Content/Python) consume the same grid for orbit capture.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import argparse
 import json
 import math
 import string
+import sys
 from pathlib import Path
 
 from . import paths, savefile, steam, village as V
@@ -29,12 +31,11 @@ DOOR_LOCAL = (1.0, 0.0, 0.0)
 
 
 def survey_root() -> Path:
-    # Prefer portable next to StolenHours.exe; fall back to LOCALAPPDATA.
-    g = Path(r"G:\Stolen Hours\survey") / MAP_ID
-    if Path(r"G:\Stolen Hours").exists() or g.parent.exists():
-        g.mkdir(parents=True, exist_ok=True)
-        return g
-    p = paths.USER_DATA / "survey" / MAP_ID
+    """Portable survey folder — never Unholy's G:\\Stolen Hours."""
+    if getattr(sys, "frozen", False):
+        p = Path(sys.executable).resolve().parent / "survey" / MAP_ID
+    else:
+        p = paths.USER_DATA / "survey" / MAP_ID
     p.mkdir(parents=True, exist_ok=True)
     return p
 

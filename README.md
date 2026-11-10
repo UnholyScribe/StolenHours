@@ -3,6 +3,8 @@
 Save editor and live runtime controller for **Fantasy Life i: The Girl Who Steals Time** (Steam app 2993780).
 Agent: **Tock** (rules in `.cursor\rules\tock.mdc`). Watchtower ID: WT-026.
 
+**Engine RE peer:** station **Loom** (WT-037) lives at `agents\Loom\` — deep UE/engine understanding (Cipher Bench toolbelt shared). Tock keeps editor + Live; Loom does not own the product UI. Workspace: `G:\Cursor\Work Projects\Fantasy Life i - Loom (Engine RE).code-workspace`.
+
 ## Goal
 - **Mode A, game closed:** unpack `gamedata.bin`, edit properties (Dosh, Lives, stats, inventory, appearance), repack, write back.
 - **Mode B, game running:** the editor locks file writes and sends commands to an in-game component that applies them on the game thread.
@@ -49,9 +51,10 @@ Nothing is hardcoded. `StolenHours.cmd where` shows what was detected:
   mapped to `Z:`, and the game-running check reads `/proc` (`stolenhours\deck.py`).
 
 ## Portable Windows exe (any PC)
-Hand someone the zip folder (`StolenHours.exe` + `_internal` + `START HERE.txt`). It does **not** ship Unholy’s
-paths, Steam id, or keys. On their PC it finds Steam / Fantasy Life i / saves itself and reads the save key from
-**their** game install.
+Current release: **0.6.0** — Live Map (Ginormosia events + spawn control with mod 0.8.1), Bag beyond-normal gear
+editor, fuller Village / Base Camp packs. Hand someone the zip folder (`StolenHours.exe` + `_internal` +
+`START HERE.txt`). It does **not** ship Unholy’s paths, Steam id, or keys. On their PC it finds Steam /
+Fantasy Life i / saves itself and reads the save key from **their** game install.
 
 **Brother test (yes, this is the point):**
 1. Unzip anywhere → double-click **`StolenHours.exe`**. No console, no Python, no “run as admin.”

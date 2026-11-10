@@ -1,5 +1,10 @@
 research/private/
+agents/
 backups/
+notes/LOOM_CHECK_LOOP.txt
+tools/SurveyMathWorker/Content/SMW_Imported/
+tools/SurveyMathWorker/ue_path.txt
+
 *.bin
 *.dll
 *.exe

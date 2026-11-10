@@ -525,10 +525,118 @@ async function sbEdit(action, p) {
 }
 
 // ---------- Bag ----------
+async function ensureGearPack() {
+  if (S.gearPack) return S.gearPack;
+  try {
+    S.gearPack = await (await fetch("game/forge/forge.json", { cache: "no-store" })).json();
+    S.gearById = Object.fromEntries((S.gearPack.items || []).map((e) => [e.id, e]));
+  } catch {
+    S.gearPack = { grades: {}, qualities: {}, status: {}, skills: {}, items: [] };
+    S.gearById = {};
+  }
+  return S.gearPack;
+}
 async function loadItems() {
   if (!S.details) S.details = await fetch("game/items/details.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  await ensureGearPack();
   S.items = await attempt(() => api("items", { category: S.cat })) || [];
   if (S.item) S.item = S.items.find((i) => i.index === S.item.index) || null;
+}
+function gearEditFromItem(it) {
+  const g = it?.gear;
+  if (!g) return null;
+  const skills = [...(g.skills || [])];
+  while (skills.length < 3) skills.push("");
+  return { grade: g.grade || 1, quality: g.quality || 0, bonus: g.bonus || 0, skills: skills.slice(0, 3) };
+}
+function gearRecipe(id) {
+  return S.gearById?.[id] || null;
+}
+/** True when grade/bonus/skills leave this item's natural Vulcan craft window. */
+function gearBeyond(id, ed) {
+  if (!ed) return false;
+  const e = gearRecipe(id);
+  const grade = Number(ed.grade) || 0;
+  if (!grade) return true;
+  if (!e?.grades) {
+    const win = S.details?.gear?.[id]?.grades;
+    if (win?.length && !win.includes(grade)) return true;
+    if ((ed.bonus || 0) > 0) return true;
+    if ((ed.skills || []).some(Boolean)) return true;
+    return false;
+  }
+  if (!e.grades.includes(grade)) return true;
+  const naturalBonus = (e.bonus || [])[grade - 1] || 0;
+  if ((ed.bonus || 0) && ed.bonus !== naturalBonus) return true;
+  const pool = new Set((e.pools || [])[grade - 1] || []);
+  for (const s of ed.skills || []) {
+    if (s && !pool.has(s)) return true;
+  }
+  return false;
+}
+function gearEditHtml(it) {
+  const D = S.details, P = S.gearPack;
+  if (!it?.gear || !D || !P) return "";
+  const ed = S.gearEdit || gearEditFromItem(it);
+  S.gearEdit = ed;
+  const beyond = gearBeyond(it.id, ed);
+  const skillLabel = (sid) => P.skills?.[sid]?.desc || P.skills?.[sid]?.name || D.skills?.[sid]?.desc || D.skills?.[sid]?.name || sid;
+  const skillIds = Object.keys(P.skills || {}).sort((a, b) => skillLabel(a).localeCompare(skillLabel(b)));
+  const skillOpt = (cur) => `<option value="">(no skill)</option>` + skillIds.map((sid) =>
+    `<option value="${h(sid)}" ${cur === sid ? "selected" : ""}>${h(skillLabel(sid))}</option>`).join("");
+  const grades = P.grades || D.grades || {};
+  const qualities = P.qualities || D.qualities || {};
+  const status = P.status || D.status || {};
+  const bonusOpt = `<option value="0">(no bonus)</option>` + [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+    `<option value="${n}" ${Number(ed.bonus) === n ? "selected" : ""}>${h(status[n] || status[String(n)] || n)}</option>`).join("");
+  return `
+    <div class="band band-gap"><span>Gear</span></div>
+    <div class="note">Edit this piece beyond what Vulcan's normal craft window allows. Changes write into the save
+      (game closed → Save to file).</div>
+    <label class="field-label">Grade</label>
+    <div class="fg-grades">${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="fg-grade ${n === ed.grade ? "active" : ""}" data-ge-grade="${n}">
+      <b>${h(grades[n] || grades[String(n)] || n)}</b></button>`).join("")}</div>
+    <label class="field-label">Quality</label>
+    <div class="fg-grades four">${[0, 1, 2, 3].map((n) => `<button type="button" class="fg-grade ${n === ed.quality ? "active" : ""}" data-ge-quality="${n}">
+      <b>${h(qualities[n] || qualities[String(n)] || n)}</b></button>`).join("")}</div>
+    <label class="field-label">Bonus stat</label>
+    <select id="ge-bonus">${bonusOpt}</select>
+    <label class="field-label">Skills <small class="muted">(up to 3)</small></label>
+    ${[0, 1, 2].map((i) => `<select class="fg-skill" data-ge-skill="${i}">${skillOpt(ed.skills[i] || "")}</select>`).join("")}
+    <div class="ge-warn" ${beyond ? "" : "hidden"}>Modified beyond normal capacity — don't use this save online or with others.</div>
+    <button class="btn btn-green" id="ge-apply" style="width:100%;margin-top:8px">Apply gear edits</button>`;
+}
+function bindGearEdit(it) {
+  if (!it?.gear || !S.gearEdit) return;
+  const ed = S.gearEdit;
+  const refresh = () => drawInventory();
+  $$("[data-ge-grade]").forEach((b) => (b.onclick = () => { ed.grade = Number(b.dataset.geGrade); refresh(); }));
+  $$("[data-ge-quality]").forEach((b) => (b.onclick = () => { ed.quality = Number(b.dataset.geQuality); refresh(); }));
+  const bonus = $("#ge-bonus");
+  if (bonus) bonus.onchange = () => { ed.bonus = Number(bonus.value) || 0; refresh(); };
+  $$("[data-ge-skill]").forEach((s) => (s.onchange = () => { ed.skills[Number(s.dataset.geSkill)] = s.value; refresh(); }));
+  const apply = $("#ge-apply");
+  if (!apply) return;
+  apply.onclick = async () => {
+    const skills = ed.skills.filter(Boolean);
+    if (new Set(skills).size !== skills.length) return dialog("Pick different skills", "The same skill is picked twice.");
+    const beyond = gearBeyond(it.id, ed);
+    if (beyond && !(await confirmDlg(
+      "Beyond normal capacity",
+      "This gear goes past what the game would normally craft (grade, bonus, and/or skills).\n\n"
+      + "Don't use this save online or with other players.\n\nApply the edit anyway?",
+    ))) return;
+    const r = await attempt(() => api("set_gear", {
+      category: S.cat, index: it.index, title: ed.grade, quality: ed.quality, bonus: ed.bonus, skills,
+    }));
+    if (!r) return;
+    S.items = r.items;
+    S.item = r.item || r.items.find((i) => i.index === it.index) || null;
+    S.gearEdit = gearEditFromItem(S.item);
+    if (r.summary) S.sum = r.summary;
+    else S.sum.dirty = true;
+    afterEdit(r.summary || null, `Updated ${it.name}`);
+  };
 }
 async function vInventory() {
   const s = S.sum;
@@ -542,6 +650,13 @@ function drawInventory() {
   const q = S.filter.toLowerCase();
   const items = S.items.filter((i) => !q || i.name.toLowerCase().includes(q) || i.id.includes(q));
   const it = S.item;
+  if (it?.gear) {
+    if (!S.gearEdit || S.gearEdit._for !== `${it.id}@${it.index}`) {
+      S.gearEdit = { ...gearEditFromItem(it), _for: `${it.id}@${it.index}` };
+    }
+  } else {
+    S.gearEdit = null;
+  }
   $("#view").innerHTML = `
   <div class="view cols" style="grid-template-columns: 1.7fr 1fr">
     <div style="display:flex;flex-direction:column;min-height:0">
@@ -565,12 +680,13 @@ function drawInventory() {
         <div class="detail-name">${h(it.name)}</div>
         <div class="muted" style="text-align:center">${h(it.id)} · slot ${it.index}</div>
         ${itemDetails(it)}
+        ${it.gear ? gearEditHtml(it) : ""}
         ${it.stock != null ? `
           <label class="field-label">Quantity</label>
           <div class="stepper"><button class="minus" data-step="-1"></button><input type="number" id="it-stock" min="1" max="65535" value="${it.stock}"><button class="plus" data-step="1"></button></div>
           <div class="quick"><button class="btn btn-cream btn-small" data-q="99">99</button><button class="btn btn-cream btn-small" data-q="999">999</button>
           <button class="btn btn-green btn-small" id="it-set" style="margin-left:auto">Set</button></div>`
-        : `<div class="note">This pocket holds single items (no stack count).</div>`}` :
+        : (it.gear ? "" : `<div class="note">This pocket holds single items (no stack count).</div>`)}` :
         `<div class="muted" style="text-align:center;padding:10px">Select something on the left to change its quantity.</div>`}
       <div class="band band-gap"><span>Add to ${h(pocketName(S.cat))}</span></div>
       <input type="text" id="add-q" placeholder="Name or id..." title="Search ${h(pocketName(S.cat))} by name or id">
@@ -580,20 +696,25 @@ function drawInventory() {
         <button class="btn btn-green shrink" id="add-go" style="margin-top:28px">Add</button>
       </div>
       <div class="note">Gear added here comes out plain, at the lowest grade it's made in. To pick its grade, quality and
-        skills, use Vulcan. Whether every item works when added is not confirmed in game yet.</div>
+        skills, use Vulcan — or select gear in this pocket and edit it below the item details.</div>
     </div></div>
   </div>`;
-  $$("[data-cat]").forEach((t) => (t.onclick = async () => { S.cat = t.dataset.cat; S.item = null; S.addPick = null; S.results = []; await loadItems(); drawInventory(); }));
+  $$("[data-cat]").forEach((t) => (t.onclick = async () => { S.cat = t.dataset.cat; S.item = null; S.gearEdit = null; S.addPick = null; S.results = []; await loadItems(); drawInventory(); }));
   $("#all-pockets").onclick = () => { S.allPockets = !S.allPockets; drawInventory(); };
   const f = $("#inv-filter");
   f.oninput = () => { S.filter = f.value; const pos = f.selectionStart; drawInventory(); const nf = $("#inv-filter"); nf.focus(); nf.setSelectionRange(pos, pos); };
-  $$("[data-idx]").forEach((t) => (t.onclick = () => { S.item = S.items.find((i) => i.index === Number(t.dataset.idx)); drawInventory(); }));
+  $$("[data-idx]").forEach((t) => (t.onclick = () => {
+    S.item = S.items.find((i) => i.index === Number(t.dataset.idx));
+    S.gearEdit = S.item?.gear ? { ...gearEditFromItem(S.item), _for: `${S.item.id}@${S.item.index}` } : null;
+    drawInventory();
+  }));
   $$("[data-step]").forEach((b) => (b.onclick = () => { const n = $("#it-stock"); n.value = Math.max(1, Math.min(65535, Number(n.value) + Number(b.dataset.step))); }));
   $$("[data-q]").forEach((b) => (b.onclick = () => ($("#it-stock").value = b.dataset.q)));
   if ($("#it-set")) $("#it-set").onclick = async () => {
     const items = await attempt(() => api("set_stock", { category: S.cat, index: it.index, stock: Number($("#it-stock").value) }));
     if (items) { S.items = items; S.item = items.find((i) => i.index === it.index); S.sum.dirty = true; afterEdit(null, `${it.name} × ${S.item.stock}`); }
   };
+  bindGearEdit(it);
   const aq = $("#add-q");
   let timer;
   aq.oninput = () => { clearTimeout(timer); timer = setTimeout(async () => { S.results = await attempt(() => api("search_items", { query: aq.value, pocket: S.cat })) || []; drawResults(); }, 180); };
@@ -603,6 +724,7 @@ function drawInventory() {
     const r = await attempt(() => api("add_item", { category: S.cat, item_id: S.addPick.id, stock: Number($("#add-n").value) }));
     if (r) {
       S.items = r.items; S.item = r.items.find((i) => i.index === r.slot); S.sum.counts[S.cat] = r.items.length; S.sum.dirty = true;
+      S.gearEdit = S.item?.gear ? { ...gearEditFromItem(S.item), _for: `${S.item.id}@${S.item.index}` } : null;
       afterEdit(null, `Added ${S.addPick.name}`);
     }
   };
@@ -1013,10 +1135,28 @@ async function vLiveMap() {
     catch { $("#view").innerHTML = `<div class="view panel"><div class="pad"><div class="band"><span>Live Map</span></div>
       <div class="note">Live map not built yet: run  py -3.12 -m stolenhours build-ui</div></div></div>`; return; }
   }
-  S.lm ??= { map: S.lmMeta.eventMap, step: 0, u: 0.5, v: 0.5, follow: true, off: new Set(LM_OFF_START), q: "" };
-  const groups = [[2, "Ginormosia"], [1, "Past"], [0, "Present"]];
+  if (!S.lmEvents) {
+    try {
+      const [ev, ctl] = await Promise.all([
+        fetch("game/events/events.json", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+        fetch("game/events/control.json", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+      ]);
+      S.lmEvents = { list: ev?.events || [], byId: {}, areas: ctl?.areas || ev?.areas || {}, worthy: new Set((ctl?.control_worthy || []).map((x) => x.id || x)) };
+      for (const e of S.lmEvents.list) S.lmEvents.byId[e.id] = e;
+      for (const e of (ctl?.west?.events || [])) {
+        if (e.id) S.lmEvents.worthy.add(e.id);
+        if (e.id && !S.lmEvents.byId[e.id]) S.lmEvents.byId[e.id] = e;
+      }
+      for (const e of (ctl?.control_worthy || [])) {
+        if (e.id) S.lmEvents.worthy.add(e.id);
+        if (e.id && e.title && !S.lmEvents.byId[e.id]) S.lmEvents.byId[e.id] = e;
+      }
+    } catch { S.lmEvents = { list: [], byId: {}, areas: {}, worthy: new Set() }; }
+  }
+  S.lm ??= { map: S.lmMeta.eventMap, step: 0, u: 0.5, v: 0.5, follow: true, off: new Set(LM_OFF_START), q: "", keep: new Set(), craft: false, focusId: null };
+  const groups = [[2, "Ginormosia"], [3, "Dream"], [1, "Past"], [0, "Present"]];
   $("#view").innerHTML = `
-  <div class="view cols" style="grid-template-columns: minmax(0, 1fr) 320px">
+  <div class="view cols" style="grid-template-columns: minmax(0, 1fr) 360px">
     <div class="panel lm-panel"><div class="lm-vp" id="lm-vp">
       <img class="lm-art" id="lm-art" alt="" draggable="false">
       <div class="lm-layer" id="lm-layer"></div>
@@ -1024,7 +1164,8 @@ async function vLiveMap() {
       <div class="lm-tip" id="lm-tip" hidden></div>
       <div class="lm-zoom"><button id="lm-in" title="Zoom in">+</button>
         <button id="lm-out" title="Zoom out">−</button>
-        <button id="lm-me" title="Follow you">◎</button></div>
+        <button id="lm-me" title="Follow you">◎</button>
+        <button id="lm-craft" title="Craft pad view (game HUD crop)" hidden>⚒</button></div>
     </div></div>
     <div class="panel lm-side"><div class="pad lm-side-top">
       <div class="band"><span>Live Map</span></div>
@@ -1032,14 +1173,25 @@ async function vLiveMap() {
       <div id="lm-mod"></div>
       <select id="lm-map">${groups.map(([r, label]) => `<optgroup label="${label}">${S.lmMeta.maps.filter((m) => m.region === r)
         .map((m) => `<option value="${m.id}">${h(m.name)}</option>`).join("")}</optgroup>`).join("")}</select>
-      <div class="band"><span>Show</span></div>
+      <div class="band"><span>Active events (live)</span></div>
+      <div id="lm-live-events" class="lm-live-ev"></div>
+      <div class="band"><span>Spawn event</span></div>
+      <div class="note">Puts an Active Event on the Ginormosia board by redrawing the lottery until it appears. Other pins reshuffle. Mod 0.8.0+.</div>
+      <input id="lm-ev-q" placeholder="Search events (Mining Mania, Legendary Ore…)">
+      <select id="lm-ev-pick" size="8" class="lm-ev-pick"></select>
+      <label class="ev-check"><input type="checkbox" id="lm-ev-keep-all"> Also keep every event already on the map (hard at full board)</label>
+      <div class="quick">
+        <button class="btn btn-green btn-small" id="lm-ev-spawn" disabled>Spawn / draw until</button>
+        <button class="btn btn-cream btn-small" id="lm-ev-redraw" disabled title="Reshuffle all open events">Redraw all</button>
+      </div>
+      <div id="lm-ev-log" class="muted lm-ev-log"></div>
+      <div class="band"><span>Show places</span></div>
       <div class="lm-cats" id="lm-cats"></div>
       <input id="lm-q" placeholder="Search this map..." value="${h(S.lm.q)}">
     </div>
     <div class="scroll lm-list" id="lm-list"></div>
-    <div class="pad lm-side-foot"><div class="note">View only: nothing here changes the game. Places, gathering spots and
-      monsters come from the game's map data, so some may still be hidden in your game until found or unlocked
-      (UNVERIFIED per kind). Map events and your position are live from the running game.</div></div>
+    <div class="pad lm-side-foot"><div class="note">Places/gathering from game tables. Active Events are live — Spawn uses the game's own lottery
+      (Loom-proven). Save file stays locked while the game runs.</div></div>
     </div>
   </div>`;
   $("#lm-map").value = S.lm.map;
@@ -1047,6 +1199,7 @@ async function vLiveMap() {
   $("#lm-q").oninput = (e) => { S.lm.q = e.target.value; lmList(); };
   lmBind();
   lmSetMap(S.lm.map, S.lm.follow);
+  lmEvBind();
   lmTick();
   modBox($("#lm-mod"));
 }
@@ -1062,17 +1215,197 @@ function lmPlayer() {
 }
 function lmSetMap(id, follow) {
   if (!S.lmMeta.maps.some((m) => m.id === id)) return;
+  if (id !== S.lm.map) S.lm.craft = false;
   const changed = id !== S.lm.map || !$("#lm-art").getAttribute("src");
   S.lm.map = id; S.lm.follow = follow;
+  const craftBtn = $("#lm-craft");
+  const hud = lmMap()?.craftHud;
+  if (craftBtn) {
+    craftBtn.hidden = !hud;
+    craftBtn.classList.toggle("on", !!(S.lm.craft && hud));
+    craftBtn.onclick = () => {
+      if (!lmMap()?.craftHud) return;
+      S.lm.craft = !S.lm.craft;
+      craftBtn.classList.toggle("on", S.lm.craft);
+      lmApplyArt();
+      lmCats(); lmList(); lmLayout();
+    };
+  }
   if (changed) {
-    const m = lmMap();
-    if (m.art) $("#lm-art").src = `game/mapview/${m.art}`; else $("#lm-art").removeAttribute("src");
+    lmApplyArt();
     S.lm.u = S.lm.v = 0.5; S.lm.step = 0;
     $("#lm-map").value = id;
+  } else {
+    lmApplyArt();
   }
   lmCats();
   lmList();
   lmLayout();
+}
+function lmApplyArt() {
+  const m = lmMap(), art = $("#lm-art");
+  if (!art || !m) return;
+  const hud = m.craftHud;
+  const useCraft = S.lm.craft && hud?.art;
+  if (useCraft || m.art) art.src = `game/mapview/${useCraft ? hud.art : m.art}`;
+  else art.removeAttribute("src");
+}
+function lmCraftUv(u, v) {
+  const hud = lmMap()?.craftHud;
+  if (!S.lm.craft || !hud) return { u, v, ok: true };
+  const cu = (u * hud.baseTextureWidth - hud.targetOffsetX) / hud.targetWidth;
+  const cv = (v * hud.baseTextureHeight - hud.targetOffsetY) / hud.targetHeight;
+  return { u: cu, v: cv, ok: cu >= -0.02 && cu <= 1.02 && cv >= -0.02 && cv <= 1.02 };
+}
+function lmEvCatalog() {
+  const E = S.lmEvents;
+  if (!E) return [];
+  const rows = [];
+  const seen = new Set();
+  const push = (e, tag) => {
+    if (!e?.id || seen.has(e.id)) return;
+    seen.add(e.id);
+    rows.push({ ...e, _tag: tag || e.why || e.cat || "" });
+  };
+  for (const e of (E.list || [])) {
+    if (E.worthy.size && !E.worthy.has(e.id)) continue;
+    push(e, E.worthy.has(e.id) ? "control" : "");
+  }
+  // control_worthy / west may include rows not in the slim events list
+  for (const id of E.worthy) push(E.byId[id], "control");
+  const pri = { legendary: 0, boss: 1, special: 2, monster: 3, gathering: 4 };
+  rows.sort((a, b) => (pri[a.cat] ?? 9) - (pri[b.cat] ?? 9)
+    || (a.priority ?? 99) - (b.priority ?? 99)
+    || String(a.title || "").localeCompare(String(b.title || ""))
+    || String(a.id).localeCompare(String(b.id)));
+  return rows;
+}
+function lmEvFill() {
+  const pick = $("#lm-ev-pick");
+  if (!pick || !S.lmEvents) return;
+  const q = ($("#lm-ev-q")?.value || "").trim().toLowerCase();
+  const areas = S.lmEvents.areas || {};
+  const rows = lmEvCatalog().filter((e) => {
+    if (!q) return true;
+    const hay = `${e.title || ""} ${e.id} ${e.cat || ""} ${areas[e.area] || e.areaName || ""}`.toLowerCase();
+    return hay.includes(q);
+  });
+  const prev = pick.value;
+  pick.innerHTML = rows.map((e) => {
+    const area = e.areaName || areas[e.area] || "";
+    const label = `${e.title || e.id}${area ? ` · ${area}` : ""}${e.cat ? ` [${e.cat}]` : ""}`;
+    return `<option value="${h(e.id)}">${h(label)}</option>`;
+  }).join("") || `<option value="">No events match</option>`;
+  if (prev && [...pick.options].some((o) => o.value === prev)) pick.value = prev;
+  lmEvEnable();
+}
+function lmEvEnable() {
+  const can = !!(S.lmLive?.mod && S.lmLive?.control && !S.lmLive?.needs_update);
+  const pick = $("#lm-ev-pick");
+  const has = !!(pick && pick.value);
+  const sp = $("#lm-ev-spawn"), rd = $("#lm-ev-redraw");
+  if (sp) sp.disabled = !can || !has || S.lmBusy;
+  if (rd) rd.disabled = !can || S.lmBusy;
+  $$("[data-lm-end]").forEach((b) => (b.disabled = !can || S.lmBusy));
+}
+function lmEvMeta(id) {
+  const M = S.lmMeta?.events?.[id] || {};
+  const E = S.lmEvents?.byId?.[id] || {};
+  const areas = S.lmEvents?.areas || {};
+  const title = M.title || E.title || id;
+  const area = M.areaName || E.areaName || areas[M.area || E.area] || "";
+  return { ...E, ...M, title, areaName: area };
+}
+function lmEvFocus(id) {
+  const e = S.lmMeta?.events?.[id];
+  if (!e) return;
+  S.lm.focusId = id;
+  S.lm.follow = false;
+  if (S.lmMeta.eventMap && S.lm.map !== S.lmMeta.eventMap) lmSetMap(S.lmMeta.eventMap, false);
+  S.lm.u = e.u; S.lm.v = e.v;
+  if (S.lm.step < 1) S.lm.step = 1;
+  lmEvLive();
+  lmList();
+  lmLayout();
+}
+function lmEvLive() {
+  const box = $("#lm-live-events");
+  if (!box) return;
+  const live = S.lmLive?.events || [];
+  if (S.lm.focusId && !live.some((ev) => ev.id === S.lm.focusId)) S.lm.focusId = null;
+  if (!S.lmLive?.mod) {
+    box.innerHTML = `<div class="muted">Connect the live mod to control events.</div>`;
+    return;
+  }
+  if (!live.length) {
+    box.innerHTML = `<div class="muted">No Active Events open right now.</div>`;
+    return;
+  }
+  box.innerHTML = live.map((ev) => {
+    const meta = lmEvMeta(ev.id);
+    const on = S.lm.focusId === ev.id ? "on" : "";
+    const where = meta.areaName || "Ginormosia";
+    return `<div class="lm-live-row ${on}" data-lm-focus="${h(ev.id)}" title="${h(ev.id)}">
+      <span>${h(meta.title)}<small>${h(where)} · ${h(LM_PHASE[ev.phase] || ev.phase)}</small></span>
+      <button class="btn btn-cream btn-small" data-lm-end="${h(ev.id)}" title="End this event">End</button>
+    </div>`;
+  }).join("");
+  $$("[data-lm-focus]", box).forEach((row) => (row.onclick = (e) => {
+    if (e.target.closest("[data-lm-end]")) return;
+    lmEvFocus(row.dataset.lmFocus);
+  }));
+  $$("[data-lm-end]", box).forEach((b) => (b.onclick = (e) => {
+    e.stopPropagation();
+    lmEvAct("end", { event_id: b.dataset.lmEnd });
+  }));
+  lmEvEnable();
+}
+function lmEvLog(text, ok = true) {
+  const el = $("#lm-ev-log");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle("lm-ev-err", !ok);
+}
+async function lmEvAct(action, extra = {}) {
+  if (S.lmBusy) return;
+  S.lmBusy = true;
+  lmEvEnable();
+  const label = action === "spawn" || action === "draw_until" ? "Drawing lottery until event appears…"
+    : action === "redraw" ? "Redrawing all map events…"
+    : action === "end" ? `Ending ${extra.event_id || "event"}…`
+    : `${action}…`;
+  lmEvLog(label);
+  try {
+    const r = await busy(label, () => api("mapview_event_control", { action, max_tries: 40, ...extra }));
+    if (r.live) S.lmLive = r.live;
+    lmEvLog(r.ok ? (r.text || "ok") : `Failed: ${r.text || "unknown"}`, r.ok);
+    lmEvLive();
+    lmStatus();
+    lmCats();
+    lmList();
+    lmLayout();
+  } catch (e) {
+    lmEvLog(String(e.message || e), false);
+  } finally {
+    S.lmBusy = false;
+    lmEvEnable();
+  }
+}
+function lmEvBind() {
+  lmEvFill();
+  lmEvLive();
+  $("#lm-ev-q").oninput = () => lmEvFill();
+  $("#lm-ev-pick").onchange = () => lmEvEnable();
+  $("#lm-ev-spawn").onclick = () => {
+    const want = $("#lm-ev-pick")?.value;
+    if (!want) return;
+    const keepAll = $("#lm-ev-keep-all")?.checked;
+    const liveIds = (S.lmLive?.events || []).map((e) => e.id).filter(Boolean);
+    // Default: keep=want (spawn-until-appears). Optional: also require every currently-open id.
+    const keep_ids = keepAll && liveIds.length ? liveIds.join(",") : want;
+    lmEvAct("spawn", { want_id: want, keep_ids });
+  };
+  $("#lm-ev-redraw").onclick = () => lmEvAct("redraw");
 }
 function lmBind() {
   const vp = $("#lm-vp");
@@ -1139,7 +1472,11 @@ const lmLiveEvents = () => (lmMap().id === S.lmMeta.eventMap && !S.lm.off.has("e
   .filter((ev) => S.lmMeta.events[ev.id]);
 function lmMarkers() {
   const q = S.lm.q.trim().toLowerCase();
-  return lmMap().markers.filter((k) => !S.lm.off.has(k[0]) && (!q || `${k[4]} ${k[5]}`.toLowerCase().includes(q)));
+  return lmMap().markers.filter((k) => {
+    if (S.lm.off.has(k[0]) || (q && !`${k[4]} ${k[5]}`.toLowerCase().includes(q))) return false;
+    if (S.lm.craft) return lmCraftUv(k[2], k[3]).ok;
+    return true;
+  });
 }
 function lmDraw() {
   const layer = $("#lm-layer");
@@ -1148,8 +1485,16 @@ function lmDraw() {
   const iconPx = LM_ICON_PX * ui * m.mapIconScale;
   const glowPx = iconPx * m.zoom[LM_STEPS[S.lm.step][0]] / m.zoom.small;
   const W = layer.clientWidth, H = layer.clientHeight, pad = iconPx * 2;
-  const at = (u, v) => `left:${S.lm.ox + u * z}px;top:${S.lm.oy + v * z}px`;
-  const inView = (u, v) => { const x = S.lm.ox + u * z, y = S.lm.oy + v * z; return x > -pad && y > -pad && x < W + pad && y < H + pad; };
+  const at = (u, v) => {
+    const p = lmCraftUv(u, v);
+    return `left:${S.lm.ox + p.u * z}px;top:${S.lm.oy + p.v * z}px`;
+  };
+  const inView = (u, v) => {
+    const p = lmCraftUv(u, v);
+    if (!p.ok) return false;
+    const x = S.lm.ox + p.u * z, y = S.lm.oy + p.v * z;
+    return x > -pad && y > -pad && x < W + pad && y < H + pad;
+  };
   let html = "";
   lmMarkers().forEach((k) => {
     if (!inView(k[2], k[3])) return;
@@ -1160,16 +1505,22 @@ function lmDraw() {
     const e = M.events[ev.id];
     const ic = M.icons[e.icon], gl = M.icons[e.glow];
     const px = iconPx * ic.scale[tier];
-    html += `<div class="lm-mark" data-lm="${h(ev.id)}" style="${at(e.u, e.v)}">
+    const focus = S.lm.focusId === ev.id;
+    html += `<div class="lm-mark ${focus ? "lm-focus" : ""}" data-lm="${h(ev.id)}" style="${at(e.u, e.v)}">
       ${gl ? lmIcon(e.glow, glowPx * gl.scale[tier], "lm-glow") : ""}
       <div class="lm-ripple" style="width:${px}px;height:${px}px;margin:${-px / 2}px 0 0 ${-px / 2}px;z-index:${ic.priority}"></div>
-      ${lmIcon(e.icon, px)}</div>`;
+      ${lmIcon(e.icon, px)}
+      ${focus ? `<span class="lm-pin-ring" style="width:${px * 1.55}px;height:${px * 1.55}px;margin:${-px * 0.775}px 0 0 ${-px * 0.775}px;z-index:${(ic.priority || 100) + 4}"></span>` : ""}
+    </div>`;
   }
   const p = lmPlayer();
   if (p) {
-    const ic = M.icons[M.player], px = LM_ICON_PX * ui * ic.scale[tier];
-    html += `<div class="lm-mark lm-player" style="${at(p.u, p.v)};z-index:${ic.priority}">
-      <div style="transform:rotate(${180 + p.yaw}deg)">${lmIcon(M.player, px)}</div></div>`;
+    const pp = lmCraftUv(p.u, p.v);
+    if (pp.ok) {
+      const ic = M.icons[M.player], px = LM_ICON_PX * ui * ic.scale[tier];
+      html += `<div class="lm-mark lm-player" style="${at(p.u, p.v)};z-index:${ic.priority}">
+        <div style="transform:rotate(${180 + p.yaw}deg)">${lmIcon(M.player, px)}</div></div>`;
+    }
   }
   layer.innerHTML = html;
   const tip = $("#lm-tip");
@@ -1179,12 +1530,13 @@ function lmDraw() {
         const k = m.markers[el.dataset.mk];
         tip.innerHTML = `<b>${h(k[4])}</b>${k[5] ? `<br><small>${h(k[5])}</small>` : ""}`;
       } else {
-        const id = el.dataset.lm, e = M.events[id], ev = S.lmLive.events.find((x) => x.id === id);
-        tip.innerHTML = `<b>${h(e.title)}</b><br><small>${h(LM_PHASE[ev.phase] || ev.phase)} · ${h(id)}</small>`;
+        const id = el.dataset.lm, meta = lmEvMeta(id), ev = S.lmLive.events.find((x) => x.id === id);
+        tip.innerHTML = `<b>${h(meta.title)}</b><br><small>${h(meta.areaName || "Ginormosia")} · ${h(LM_PHASE[ev?.phase] || ev?.phase || "")}</small>`;
       }
       tip.style.left = el.style.left; tip.style.top = el.style.top; tip.hidden = false;
     };
     el.onpointerleave = () => (tip.hidden = true);
+    if (el.dataset.lm) el.onclick = () => lmEvFocus(el.dataset.lm);
   });
 }
 function lmCats() {
@@ -1213,9 +1565,12 @@ function lmList() {
   const evs = lmLiveEvents().filter((ev) => !q || M.events[ev.id].title.toLowerCase().includes(q));
   const ms = lmMarkers();
   let html = evs.length ? `<div class="group-title">Map events now</div>` + evs.map((ev) => {
-    const e = M.events[ev.id];
-    return `<div class="lm-row" data-go="${e.u},${e.v}"><img src="game/mapview/icons/${e.icon}.png" alt="">
-      <span>${h(e.title)}<small>${h(LM_PHASE[ev.phase] || ev.phase)}</small></span></div>`;
+    const e = M.events[ev.id], meta = lmEvMeta(ev.id);
+    const on = S.lm.focusId === ev.id ? "on" : "";
+    return `<div class="lm-row ${on}" data-lm-focus="${h(ev.id)}" data-go="${e.u},${e.v}">
+      <img src="game/mapview/icons/${e.icon}.png" alt="">
+      <span>${h(meta.title)}
+        <small>${h(meta.areaName || "Ginormosia")} · ${h(LM_PHASE[ev.phase] || ev.phase)}</small></span></div>`;
   }).join("") : "";
   let last = null;
   ms.slice(0, LM_LIST_MAX).forEach((k) => {
@@ -1225,7 +1580,8 @@ function lmList() {
   });
   if (ms.length > LM_LIST_MAX) html += `<div class="muted pad">${ms.length - LM_LIST_MAX} more: search or switch some kinds off to narrow the list.</div>`;
   box.innerHTML = html || `<div class="muted pad">Nothing to list. Switch some kinds on above${q ? " or change the search" : ""}.</div>`;
-  $$("[data-go]", box).forEach((r) => (r.onclick = () => {
+  $$("[data-lm-focus]", box).forEach((r) => (r.onclick = () => lmEvFocus(r.dataset.lmFocus)));
+  $$("[data-go]:not([data-lm-focus])", box).forEach((r) => (r.onclick = () => {
     const [u, v] = r.dataset.go.split(",").map(Number);
     S.lm.follow = false; S.lm.u = u; S.lm.v = v;
     if (S.lm.step < 1) S.lm.step = 1;
@@ -1242,6 +1598,8 @@ async function lmTick() {
   const p = S.lmLive.player;
   if (S.lm.follow && p && p.map !== S.lm.map && S.lmMeta.maps.some((m) => m.id === p.map)) lmSetMap(p.map, true);
   lmStatus();
+  lmEvLive();
+  lmEvEnable();
   if (JSON.stringify(S.lmLive.events || null) !== had) { lmCats(); lmList(); }
   lmLayout();
   S.lmTimer = setTimeout(lmTick, LM_POLL_MS);
@@ -1257,9 +1615,10 @@ function lmStatus() {
   veil.textContent = msg;
   const dot = (on) => `<span class="dot-big" style="color:${on ? "#3fae1b" : "#b9a27a"}">●</span>`;
   const p = L.player, here = S.lmMeta.maps.find((m) => m.id === p?.map);
+  const ctrl = L.control ? "event control ready" : (L.mod ? "view only — update mod to 0.8.0+ to spawn" : "");
   $("#lm-status").innerHTML = `
     <div class="status-row">${dot(L.game)} Game ${L.game ? "running" : "not running"}</div>
-    <div class="status-row">${dot(L.mod && !L.needs_update)} Mod ${L.needs_update ? "needs update" : L.mod ? "connected" : "not connected"}</div>
+    <div class="status-row">${dot(L.mod && !L.needs_update)} Mod ${L.needs_update ? "needs update" : L.mod ? "connected" : "not connected"}${ctrl ? ` · ${ctrl}` : ""}</div>
     ${p ? `<div class="muted">You: ${here ? h(here.name) : `${h(p.map)} (no map for this place)`}${p.map === S.lm.map ? ` · ${Math.round(p.x)}, ${Math.round(p.y)}` : ""}</div>` : ""}
     ${(L.notes || []).map((n) => `<div class="muted ev-unmet">${h(n)}</div>`).join("")}`;
 }
@@ -1498,23 +1857,25 @@ async function islTerrain() {
   const raised = (g.cells || []).filter((c) => c.h > 0).length;
   const waterN = (g.cells || []).filter((c) => c.surface === "water").length;
 
+  const toolHint = S.terrainTool === "lower" ? "dig (−150 Z)"
+    : S.terrainTool === "level" ? "level toward neighbors"
+    : S.terrainTool === "shave" ? "toggle Shave bevel (Scraped_*)"
+    : "pile up (+150 Z)";
   $("#isl-body").innerHTML = `
     <div class="row col-filters" style="flex-wrap:wrap">
-      <button class="tab ${S.terrainTool === "raise" ? "active" : ""}" data-ttool="raise">Raise Ground</button>
-      <button class="tab ${S.terrainTool === "lower" ? "active" : ""}" data-ttool="lower">Lower Ground</button>
-      <button class="tab ${S.terrainTool === "level" ? "active" : ""}" data-ttool="level">Level / Smooth</button>
+      <button class="tab ${S.terrainTool === "raise" ? "active" : ""}" data-ttool="raise">Pile Up</button>
+      <button class="tab ${S.terrainTool === "lower" ? "active" : ""}" data-ttool="lower">Dig</button>
+      <button class="tab ${S.terrainTool === "shave" ? "active" : ""}" data-ttool="shave">Shave</button>
+      <button class="tab ${S.terrainTool === "level" ? "active" : ""}" data-ttool="level">Level</button>
       <button class="btn btn-cream btn-small" id="vil-cam-reset">Reset cam</button>
       <button class="btn btn-cream btn-small" id="vil-refresh">Reload</button>
     </div>
-    <div class="vil-3d" id="vil-3d">${vilOutdoorHud("Base Camp · Terrain")}</div>
-    <div class="note" style="margin-top:6px">Click a tile to ${
-      S.terrainTool === "lower" ? "lower" : S.terrainTool === "level" ? "level toward neighbors" : "raise"
-    } it.
-      Procedural mesh from <code>land_obj</code>/<code>water_obj</code> height tiers (even cells).
-      Writes the save — check in game (semantics UNVERIFIED).</div>`;
+    <div class="vil-3d" id="vil-3d">${vilOutdoorHud("Base Camp · Hagram MapCraft")}</div>
+    <div class="note" style="margin-top:6px">Click a tile to ${toolHint}.
+      Same ops as in-game Hagram (Loom): Z steps of 150 on <code>land_obj</code>/<code>water_obj</code>; Shave is bit0, not height.</div>`;
 
   $("#isl-side").innerHTML = `
-    <div class="band"><span>Terraforming</span></div>
+    <div class="band"><span>Hagram terrain</span></div>
     <div class="it-stat"><span>Grid</span><b>${g.width || 0}×${g.depth || 0}</b></div>
     <div class="it-stat"><span>Raised cells</span><b>${fmt(raised)}</b></div>
     <div class="it-stat"><span>Water cells</span><b>${fmt(waterN)}</b></div>
@@ -1523,8 +1884,8 @@ async function islTerrain() {
     <div class="row" style="margin-top:14px">
       <button class="btn btn-cream" id="isl-reset-shave" ${t.shaved ? "" : "disabled"}>Reset all Shave flags</button>
     </div>
-    <div class="note" style="margin-top:10px">Default ground is tier 0 (Y=0). Each raise stacks a
-      <code>land_obj</code> (+1.5 m). Lower removes the top tier; at ground, land becomes water.</div>`;
+    <div class="note" style="margin-top:10px">Pile Up / Dig = <code>Location.Z ±150</code> (Loom save probe).
+      Shave toggles the bevel flag the game uses for Scraped corner patterns.</div>`;
 
   $$("[data-ttool]").forEach((b) => (b.onclick = () => {
     S.terrainTool = b.dataset.ttool;
@@ -1564,7 +1925,8 @@ async function islTerrain() {
       keepCamera: keep || S.terrainCamKept,
       onTerrainPaint: async ({ ix, iy, mode: tool }) => {
         const action = tool === "lower" ? "terrain_lower"
-          : tool === "level" ? "terrain_level" : "terrain_raise";
+          : tool === "level" ? "terrain_level"
+          : tool === "shave" ? "terrain_shave" : "terrain_raise";
         const r = await attempt(() => api("village_edit", { action, map_id: mapId, ix, iy, kind: "map" }));
         if (!r) return;
         if (r.terrain) {
@@ -1639,9 +2001,13 @@ async function loadCraftCatalog() {
   if (S.craftCat) return S.craftCat;
   try {
     const j = await (await fetch("game/village/craft.json", { cache: "no-store" })).json();
-    S.craftCat = { objects: j.objects || [], houses: j.houses || [] };
+    S.craftCat = {
+      objects: j.objects || [], houses: j.houses || [],
+      wallsFloors: j.wallsFloors || [], landmarks: j.landmarks || {},
+      terrainOps: j.terrainOps || null,
+    };
   } catch {
-    S.craftCat = { objects: [], houses: [] };
+    S.craftCat = { objects: [], houses: [], wallsFloors: [], landmarks: {} };
   }
   return S.craftCat;
 }
@@ -1771,7 +2137,7 @@ async function islVillage() {
            <span class="muted" id="vil-live-txt" style="margin-left:6px"></span>`
         : `Offline schematic. Start the game with the Stolen Hours mod (0.7+) for live Customization + craft cam.`}
       <div style="margin-top:6px">
-        <b>Survey math</b> — UE 10×10 m grid + door arrows from <code>G:\\Stolen Hours\\survey</code>.
+        <b>Survey math</b> — UE 10×10 m grid + door arrows (stored under this PC's Stolen Hours data folder).
         <button class="btn btn-cream btn-small" id="vil-survey-refresh" style="margin-left:6px">Refresh survey</button>
         <span class="muted" id="vil-survey-txt" style="margin-left:6px"></span>
       </div>
@@ -2085,13 +2451,14 @@ async function islHouse() {
   S.vilHSel ||= null;
   S.vilPlaceId ||= "";
   S.vilCatQ ||= "";
-  S.vilHTab ||= "furniture"; // furniture | placed | houses
+  S.vilHTab ||= "furniture"; // furniture | placed | houses | walls
   const v = S.vilH;
   const placed = [...(v.placed || [])];
   const nameOf = (id) => (craft.objects.find((o) => o.id === id) || {}).name
     || (craft.houses.find((hh) => hh.id === id || hh.craftObj === id) || {}).name || id;
   placed.forEach((p) => { if (!p.name || p.name === p.craftObjId) p.name = nameOf(p.craftObjId) || p.name; });
   const FURN = new Set(["OBJECT", "TABLE", "WALLDECO", "RUG", "LUNCH_EATS", "LUNCH_DRINK"]);
+  const wallsFloors = craft.wallsFloors || [];
 
   $("#isl-body").innerHTML = `
     <div class="row col-filters" style="flex-wrap:wrap">
@@ -2137,6 +2504,7 @@ async function islHouse() {
       <div class="row" style="gap:4px;margin:12px 0 8px;flex-wrap:wrap">
         <button class="tab ${S.vilHTab === "furniture" ? "active" : ""}" data-htab="furniture">Furniture</button>
         <button class="tab ${S.vilHTab === "placed" ? "active" : ""}" data-htab="placed">Placed (${placed.length})</button>
+        <button class="tab ${S.vilHTab === "walls" ? "active" : ""}" data-htab="walls">Walls &amp; floors</button>
         <button class="tab ${S.vilHTab === "houses" ? "active" : ""}" data-htab="houses">Houses</button>
       </div>
       <div class="vil-cat" id="vil-cat"></div>`;
@@ -2152,6 +2520,18 @@ async function islHouse() {
         if (window.Village3D) window.Village3D.highlight(S.vilHSel);
         side();
       }));
+    } else if (S.vilHTab === "walls") {
+      const rows = wallsFloors.filter((r) => !q || `${r.name} ${r.itemId} ${r.designId}`.toLowerCase().includes(q));
+      const walls = rows.filter((r) => r.Type === 117);
+      const floors = rows.filter((r) => r.Type === 118);
+      cat.innerHTML = `
+        <div class="note" style="margin:4px 0 8px">Game Type 117/118 via IndoorDesigen (Loom 74/74). Apply-to-room write still UNVERIFIED — catalog + mesh paths ready.</div>
+        <div class="muted" style="padding:4px 0">Wallpaper (${walls.length})</div>
+        ${walls.map((r) => `<div class="vil-list-row" title="${h((r.meshes || [])[0] || "")}">
+          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></div>`).join("") || `<div class="muted">None.</div>`}
+        <div class="muted" style="padding:8px 0 4px">Floors (${floors.length})</div>
+        ${floors.map((r) => `<div class="vil-list-row" title="${h((r.meshes || [])[0] || "")}">
+          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></div>`).join("") || `<div class="muted">None.</div>`}`;
     } else if (S.vilHTab === "houses") {
       cat.innerHTML = `
         <div class="muted" style="padding:4px 0">On your island</div>

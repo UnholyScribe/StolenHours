@@ -23,7 +23,7 @@ import re
 from .mapevents import _Table
 
 CATEGORIES = [
-    # id, label, icon shown in the list
+    # id, label, icon shown in the list (icons = game mapIconType / tex_icon_map_mui*)
     ("tower", "Towers", 118),
     ("town", "Towns", 119),
     ("travel", "Travel points", 118),
@@ -36,6 +36,10 @@ CATEGORIES = [
     ("place", "Other places", 172),
     ("leafe", "Leafe", 120),
     ("request", "Requests", 5),
+    ("quest", "Quest marks", 6),
+    ("talk", "Speech", 10),
+    ("dream", "Bed to Dreams", 245),
+    ("darkdon", "Dark Don", 191),
     ("monster", "Monsters", 3),
     ("wood", "Trees", 18),
     ("ore", "Ore", 22),
@@ -45,6 +49,13 @@ CATEGORIES = [
 PICK = {1: ("wood", 18, "Tree"), 2: ("ore", 22, "Ore"), 3: ("fish", 20, "Fishing spot"), 4: ("crop", 24, "Crops")}
 SHOP_ICONS = set(range(57, 104)) | {121, 140, 142, 143, 144, 165, 173, 182}
 SKIP_ICONS = {0, 1, 2, 108, 109, 110, 111, 112, 113, 114, 136}  # player, quest pins, event glows, online-only marker
+# Loom dream-entry FuncPoints on Base Camp (Map_000100) — always pin even if cond-gated in game.
+DREAM_FUNCS = {
+    "FP_darkdon": ("darkdon", 191, "Dark Don"),
+    "FP_darkdon_bed": ("dream", 245, "Bed to Dreams"),
+    "FP_roguelike_guide_mark": ("quest", 139, "Roguelike guide"),
+    "FP_Highbattle_darkdon_mark": ("quest", 139, "Strong boss mark"),
+}
 
 
 def _noun(rows: dict, key: str) -> str | None:
@@ -71,6 +82,14 @@ def _icon_category(t: int) -> str:
         return "shop"
     if t in (36, 49, 123, 135, 181, 217, 218):
         return "dungeon"
+    if t in (191, 220):
+        return "darkdon"
+    if t == 245:
+        return "dream"
+    if t in (6, 28, 139, 250):
+        return "quest"
+    if t in (10, 27):
+        return "talk"
     return "place"
 
 
@@ -118,9 +137,16 @@ def build(maps: dict[str, dict], uv) -> dict[str, list]:
         for r in _table(f"Map/{m}/{m}_GDSMapFuncPoint.json").values():
             t = r.get("mapIconType", 0)
             pos = r.get("Position") or {}
-            if t in SKIP_ICONS or t == 118 or not (pos.get("X") or pos.get("Y")):
+            fid = r.get("funcPointId") or ""
+            if not (pos.get("X") or pos.get("Y")):
                 continue
-            name = _noun(map_noun, (r.get("GameIconInfo") or {}).get("textId", "None")) or icon_name(t) or r["funcPointId"]
+            if fid in DREAM_FUNCS:
+                cat, icon, label = DREAM_FUNCS[fid]
+                add(m, cat, icon if t in (0, icon) else t or icon, pos["X"], pos["Y"], label)
+                continue
+            if t in SKIP_ICONS or t == 118:
+                continue
+            name = _noun(map_noun, (r.get("GameIconInfo") or {}).get("textId", "None")) or icon_name(t) or fid
             add(m, _icon_category(t), t, pos["X"], pos["Y"], name)
         for r in _table(f"Map/{m}/{m}_GDSMapJumpFuncPointPlacement.json").values():
             t = r.get("mapIconType", 0)
