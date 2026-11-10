@@ -70,6 +70,31 @@ def test_add_item_and_stock(loaded):
     assert len(handles) == len(set(handles)) == before + 1
 
 
+def test_set_gear_rewrites_grade_quality_bonus_skills(loaded):
+    sf = fresh(loaded)
+    gear = next(
+        c for c in sf.inventory
+        if any(it["ItemId"] not in savefile.EMPTY_IDS and "itemTitle" in it
+               for it in sf.inventory[c])
+    )
+    idx = next(
+        i for i, it in enumerate(sf.inventory[gear])
+        if it["ItemId"] not in savefile.EMPTY_IDS and "itemTitle" in it
+    )
+    before_id = sf.inventory[gear][idx]["ItemId"]
+    nslots = len(sf.inventory[gear][idx]["grantSkillId"])
+    sf.set_gear(gear, idx, title=5, quality=3, bonus=2, skills=())
+    it = sf.inventory[gear][idx]
+    assert it["ItemId"] == before_id
+    assert it["itemTitle"] == 5 and it["Quality"] == 3
+    assert it["addEquipStatus"] == [{"Type": 2, "Value": 0}]
+    assert it["grantSkillId"] == ["None"] * nslots
+    with pytest.raises(savefile.SaveFileError):
+        sf.set_gear(gear, idx, title=6)
+    with pytest.raises(savefile.SaveFileError):
+        sf.set_gear("invMaterial", 0, title=1)
+
+
 def test_life_edit(loaded):
     sf = fresh(loaded)
     sf.set_life("life0005", level=20, exp=5000, rank=2)

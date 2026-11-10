@@ -7,7 +7,7 @@ local LIVE_DIR = (os.getenv("LOCALAPPDATA") or ".") .. "\\StolenHours\\live\\"
 local CMD = LIVE_DIR .. "cmd.txt"
 local ACK = LIVE_DIR .. "ack.txt"
 local HEARTBEAT = LIVE_DIR .. "heartbeat.txt"
-local VERSION = "0.8.1"
+local VERSION = "0.8.2"
 local busy = false
 local Dump = require("stolenhours_dump")
 local Camera = require("stolenhours_camera")
@@ -326,8 +326,8 @@ handlers.EVENTS = function()
         local info = read_path(qs, "m_permanent.ActiveEventInfo")
         if info == nil or not info.ForEach then error("ActiveEventInfo missing") end
         info:ForEach(function(k)
-            if type(k) == "userdata" and k.get then k = k:get() end
-            add(to_text(k), "1")
+            -- UE4SS RemoteUnrealParam keys are userdata; the Lua mock uses tables with :get().
+            add(to_text(unwrap(k)), "1")
         end)
     end)
     if not ok then notes[#notes + 1] = "ActiveEventInfo: " .. tostring(err) end

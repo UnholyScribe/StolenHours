@@ -70,7 +70,7 @@ def mod(tmp_path):
 
 def test_ping_and_unknown(mod):
     _, send, *_ = mod
-    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.5.0"]
+    assert send("a1\tPING") == ["a1", "OK", "pong StolenHours 0.8.2"]
     assert send("a2\tNOPE")[1] == "ERR"
 
 
@@ -168,12 +168,19 @@ QUESTS = r'''
 local F = MOCK.fname
 local qs = MOCK.class("Class /Script/DP1Project.GDDQuestStatus", {})
 MOCK.object("GDDQuestStatus /Engine/Transient.GDDQuestStatus_0", qs, {
-    m_permanent = { Active = MOCK.map({
-        { F("qsf_active_event_001_01"), { phase = 1 } },
-        { F("qsf_active_event_002_01"), { phase = 0 } },
-        { F("qsf_active_event_003_01"), { phase = 254 } },
-        { F("qsf_active_event_004_01"), { phase = 3 } },
-    }) },
+    m_permanent = {
+        -- 0.8.2 prefers ActiveEventInfo (open board) over every Active phase 1-3.
+        ActiveEventInfo = MOCK.map({
+            { F("qsf_active_event_001_01"), { timePeriodChangeCount = 0 } },
+            { F("qsf_active_event_004_01"), { timePeriodChangeCount = 0 } },
+        }),
+        Active = MOCK.map({
+            { F("qsf_active_event_001_01"), { phase = 1 } },
+            { F("qsf_active_event_002_01"), { phase = 0 } },
+            { F("qsf_active_event_003_01"), { phase = 254 } },
+            { F("qsf_active_event_004_01"), { phase = 3 } },
+        }),
+    },
     m_volatile = { ActiveEventStatusV = { openActiveEventList = MOCK.array({
         { activeEventId = F("qsf_active_event_001_01") },
         { activeEventId = F("qsf_active_event_009_01") },
@@ -197,7 +204,8 @@ def test_events_and_player(mod):
     rt.execute(QUESTS)
     r = send("e1\tEVENTS")
     assert r[1] == "OK", r
-    assert r[2] == "3|qsf_active_event_001_01:1,qsf_active_event_004_01:3,qsf_active_event_009_01:open"
+    # ActiveEventInfo ids as :1, then open list adds 009 as :open (001 already seen).
+    assert r[2] == "3|qsf_active_event_001_01:1,qsf_active_event_004_01:1,qsf_active_event_009_01:open"
     assert send("e2\tPLAYER") == ["e2", "OK", "53982.0,38430.0,400.0,-90.0,Map_200000"]
 
 
@@ -206,7 +214,8 @@ def test_events_reports_unreadable_lists(mod):
     rt.execute('MOCK.object("GDDQuestStatus /Engine/Transient.GDDQuestStatus_0", '
                'MOCK.class("Class /Script/DP1Project.GDDQuestStatus", {}), { m_permanent = {} })')
     r = send("e1\tEVENTS")
-    assert r[1] == "OK" and r[2].startswith("0||Active: ") and "open list: " in r[2]
+    assert r[1] == "OK" and r[2].startswith("0||")
+    assert "ActiveEventInfo: " in r[2] and "open list: " in r[2] and "Active: " in r[2]
 
 
 def test_builtin_dumpers_missing_is_reported(mod):

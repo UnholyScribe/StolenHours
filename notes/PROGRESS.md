@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-11-10: Ship 0.6.1 to GitHub (Tock)
+- Version **0.6.1** / mod **0.8.2**: EVENTS `ActiveEventInfo` ForEach now `unwrap(k)` (was userdata-only;
+  broken on table RemoteUnrealParam wrappers). pytest **138 passed**; portable_check clean; GitHub zip.
+
+## 2026-11-10: 30m Loom loop + editor debug pass (Tock)
+- Loom check-in retargeted to **every 30 minutes** (`$interval = 1800`); loop stays armed until
+  Loom jobs done + last handoff applied. Weapon-skin dig parked by Loom until Base Camp leftovers clear.
+- Full editor pytest: **138 passed**. Fixed live-map/lua tests for mod **0.8.1** + FakeBridge.ping /
+  snapshot `control`/`mod_version`. Real bug: EVENTS `ActiveEventInfo` ForEach used userdata-only
+  unwrap — now `unwrap(k)` so table RemoteUnrealParam mocks (and any table wrappers) work. Added
+  `set_gear` unit test.
+
 ## 2026-11-10: Ship 0.6.0 to GitHub (Tock)
 - Version **0.6.0**: Live Map (map decrypt + AE spawn 0.8.1), Bag beyond-normal gear editor, Base Camp pack
   pull (cook-absent / fence VPC / shave / outdoor / buildings / land / indoor 307).

@@ -57,11 +57,14 @@ def test_built_data_is_consistent():
 
 
 class FakeBridge:
-    def __init__(self, replies, alive=True):
-        self.replies, self.alive = replies, alive
+    def __init__(self, replies, alive=True, ping_text="pong StolenHours 0.8.2"):
+        self.replies, self.alive, self.ping_text = replies, alive, ping_text
 
     def mod_alive(self):
         return self.alive
+
+    def ping(self):
+        return live.Reply(True, self.ping_text)
 
     def events(self):
         return self.replies["EVENTS"]
@@ -82,6 +85,7 @@ def test_live_snapshot_parses_mod_replies(monkeypatch):
                              "PLAYER": live.Reply(True, "120000.0,0.0,5.0,90.0,Map_200000")}), monkeypatch)
     out = b.api_mapview_live()
     assert out["game"] and out["mod"]
+    assert out["control"] is True and "0.8.2" in (out["mod_version"] or "")
     assert out["events"] == [{"id": "qsf_active_event_001_01", "phase": "1"}, {"id": "abc", "phase": "open"}]
     assert out["player"]["map"] == "Map_200000" and out["player"]["yaw"] == 90.0
     assert (out["player"]["u"], out["player"]["v"]) == (0.5, 1.0)
@@ -104,4 +108,14 @@ def test_live_snapshot_flags_an_old_mod(monkeypatch):
 
 def test_live_snapshot_without_mod(monkeypatch):
     out = _backend(FakeBridge({}, alive=False), monkeypatch).api_mapview_live()
-    assert out == {"game": True, "mod": False, "events": None, "player": None, "notes": []}
+    assert out == {"game": True, "mod": False, "events": None, "player": None, "notes": [],
+                   "mod_version": None, "control": False}
+
+
+def test_live_snapshot_flags_pre_08_mod(monkeypatch):
+    b = _backend(FakeBridge({"EVENTS": live.Reply(True, "0|"),
+                             "PLAYER": live.Reply(False, "no player")},
+                            ping_text="pong StolenHours 0.7.0"), monkeypatch)
+    out = b.api_mapview_live()
+    assert out["mod"] and out["control"] is False
+    assert any("0.8.0" in n for n in out["notes"])
