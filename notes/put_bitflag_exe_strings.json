@@ -1,0 +1,44 @@
+{
+  "EMapCraft[A-Za-z0-9_:]+": [
+    "EMapCraftGuideType",
+    "EMapCraftGuideType::CraftItem",
+    "EMapCraftGuideType::CraftNomal",
+    "EMapCraftGuideType::CraftObjectPut",
+    "EMapCraftGuideType::GoddessHerb",
+    "EMapCraftGuideType::HoldItem",
+    "EMapCraftGuideType::Nomal",
+    "EMapCraftGuideType::NomalItem",
+    "EMapCraftMenuArrowType",
+    "EMapCraftMenuArrowType::Left",
+    "EMapCraftMenuArrowType::None",
+    "EMapCraftMenuArrowType::Right",
+    "EMapCraftMenuCtrlType",
+    "EMapCraftMenuCtrlType::CraftObj",
+    "EMapCraftMenuCtrlType::Ground",
+    "EMapCraftMenuCtrlType::None",
+    "EMapCraftMenuCtrlType::Tile",
+    "EMapCraftMenuCtrlType::TileSelect",
+    "EMapCraftMenuCtrlType::Water",
+    "EMapCraftMenuMode",
+    "EMapCraftMenuMode::CraftObjLayout",
+    "EMapCraftMenuMode::MapCraft"
+  ],
+  "objStatusBitFlag": [
+    "objStatusBitFlag"
+  ],
+  "IsPlannedConstruct": [
+    "IsPlannedConstruct"
+  ],
+  "ShaveLand": [
+    "ShaveLand"
+  ],
+  "CraftObjectPut": [
+    "CraftObjectPut"
+  ],
+  "putCraftObj": [
+    "putCraftObj"
+  ],
+  "BitFlag": [
+    "BitFlag"
+  ]
+}

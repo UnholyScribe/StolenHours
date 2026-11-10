@@ -51,8 +51,8 @@ Nothing is hardcoded. `StolenHours.cmd where` shows what was detected:
   mapped to `Z:`, and the game-running check reads `/proc` (`stolenhours\deck.py`).
 
 ## Portable Windows exe (any PC)
-Current release: **0.6.1** — Live Map (Ginormosia events + spawn control with mod 0.8.2), Bag beyond-normal gear
-editor, fuller Village / Base Camp packs. Hand someone the zip folder (`StolenHours.exe` + `_internal` +
+Current release: **0.6.2** — Live Map (Ginormosia events + spawn control with mod 0.8.2), Bag beyond-normal gear
+editor, full Loom Base Camp pack index in Village, static numeric mapId trio for place/remove. Hand someone the zip folder (`StolenHours.exe` + `_internal` +
 `START HERE.txt`). It does **not** ship Unholy’s paths, Steam id, or keys. On their PC it finds Steam /
 Fantasy Life i / saves itself and reads the save key from **their** game install.
 

@@ -6,8 +6,9 @@ Save layout (verified on Unholy's save; see FINDINGS):
 - `CraftExParamP.exParamHouse` — house shells linked via `exParamHandle`
 - Inventory pocket `invCraft` — bag stock for Legal placement mode
 
-Numeric `craftObjStatusP.mapId` is NOT the string map id; it is learned from existing
-objects on each craft area (hash algorithm UNVERIFIED).
+Numeric `craftObjStatusP.mapId` is NOT the string map id. Loom CONFIRMED a static trio
+(Base Camp / My House / NPCEmptyRoom_00); encode algorithm still UNVERIFIED. Editor prefers
+that lookup, then learns from existing objects on the area.
 
 gridIdx (Base Camp / map Category 0): `ix * Width + iy + iz * Width * Depth`
 with Location = origin + (ix,iy,iz) * voxel. Outdoor origin comes from land_obj grid 0
@@ -51,6 +52,12 @@ PLACE_CATS = {
 SKIP_IDS = {"land_obj", "water_obj", "None", ""}
 MAP_BASE = "Map_000100"
 MAP_MYHOUSE = "Map_MyHouse"
+# Loom CONFIRMED from save (mapid_lookup_confirmed.json). Encode still UNVERIFIED.
+MAP_ID_NUMERIC = {
+    "Map_000100": 1807587003,
+    "Map_MyHouse": 535592167,
+    "NPCEmptyRoom_00": 616711470,
+}
 
 
 def extract(force: bool = False) -> None:
@@ -381,6 +388,9 @@ class Village:
         raise SaveFileError(f"no craft area for map {map_id}" + (f" ({kind})" if kind else ""))
 
     def numeric_map_id(self, sf: SaveFile, area: dict) -> int:
+        sid = area.get("mapId")
+        if sid in MAP_ID_NUMERIC:
+            return MAP_ID_NUMERIC[sid]
         hdls = set(_area_handles(area))
         arr = sf.sd["m_CraftStatus"]["craftObjStatusPArray"]
         counts: dict[int, int] = {}
@@ -394,8 +404,8 @@ class Village:
                 counts[mid] = counts.get(mid, 0) + 1
         if not counts:
             raise SaveFileError(
-                f"cannot learn numeric mapId for {area.get('mapId')}; place something in game first "
-                "(hash algorithm UNVERIFIED)")
+                f"cannot learn numeric mapId for {sid}; place something in game first "
+                "(static lookup miss; hash algorithm UNVERIFIED)")
         return max(counts.items(), key=lambda kv: kv[1])[0]
 
     def _obj_by_handle(self, sf: SaveFile, handle: int) -> dict | None:

@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-11-10: Ship 0.6.2 (Tock)
+- Unshipped after 0.6.1: full Loom `basecamp_pack_index` (89 keys vs 26 in EXE) + `MAP_ID_NUMERIC`
+  trio in `village.py`. Reddit Decivre reply+DM done (PC/Steam only; asked Switch/mobile intent).
+- Dig live + weapon-skin still parked. 30m Loom loop stays.
+
+## 2026-11-10: Full Loom pack_index merge (Tock)
+- Unholy nudge: editor pack was thin (33 keys) vs Loom index (85). Merged full
+  `basecamp_pack_index` into `basecamp_pack.json` + surfaced slices on `craft.json`
+  (furniture pack, live ExeCmds, development, npc_rooms, reform/bridge groups, shape,
+  mapcraft UI model, stand ranges, size access, water VPC, leftovers, kits…).
+- Dig live proof + weapon-skin still parked; 30m loop stays.
+
+## 2026-11-10: 30m Loom tick — mapId + Paint pack (Tock)
+- Pulled Loom `ready_for_tock`: `MAP_ID_NUMERIC` trio in `village.py`; `basecamp_pack`/`craft`
+  got 14 Paint LAND ids, hagram ops, dig water Z, shape summary, dig playbook, mapid lookup.
+- Dig/MapCraft live still blocked (Loom on Map_200000). Weapon-skin parked. 30m loop stays armed.
+
 ## 2026-11-10: Ship 0.6.1 to GitHub (Tock)
 - Version **0.6.1** / mod **0.8.2**: EVENTS `ActiveEventInfo` ForEach now `unwrap(k)` (was userdata-only;
   broken on table RemoteUnrealParam wrappers). pytest **138 passed**; portable_check clean; GitHub zip.

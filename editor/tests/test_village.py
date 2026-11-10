@@ -54,11 +54,11 @@ def test_state_base_and_myhouse(vil, loaded):
     sf = fresh(loaded)
     base = vil.state(sf, MAP_BASE, "map")
     assert base["area"]["width"] >= 16
-    assert base["area"]["numericMapId"] != 0
+    assert base["area"]["numericMapId"] == village.MAP_ID_NUMERIC[MAP_BASE]
     assert isinstance(base["placed"], list)
     house = vil.state(sf, MAP_MYHOUSE, "indoor")
     assert house["area"]["mapId"] == MAP_MYHOUSE
-    assert house["area"]["numericMapId"] != 0
+    assert house["area"]["numericMapId"] == village.MAP_ID_NUMERIC[MAP_MYHOUSE]
 
 
 def test_place_move_remove_free_roundtrip(vil, loaded):

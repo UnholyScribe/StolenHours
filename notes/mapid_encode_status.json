@@ -1,0 +1,30 @@
+{
+  "status": "UNVERIFIED",
+  "confirmed_pairs": {
+    "Map_000100": 1807587003,
+    "Map_MyHouse": 535592167,
+    "NPCEmptyRoom_00": 616711470
+  },
+  "unlearned": [
+    "NPCEmptyRoom_01"
+  ],
+  "rejected_algos": [
+    "CRC32",
+    "FNV1a",
+    "Murmur3 seed0-4096",
+    "CityHash64 low/high",
+    "XXH32",
+    "UE Strihash ANSI/TCHAR",
+    "Java hashCode",
+    "asset FName crc table match"
+  ],
+  "exe_notes": [
+    "GetMapID/SetMapID strings exist (likely editor)",
+    "numeric ints absent from shipping exe LE",
+    "craft mapId ints != asset {crc,Name} for Map_200000-style table",
+    "CONFIRMED 2026-11-10: trio numeric ints absent from NFL1-Win64-Shipping.exe LE/BE",
+    "Map_000100 string x3, Map_MyHouse x1, NPCEmptyRoom_00 x0 in exe"
+  ],
+  "ship": "static lookup + learn-from-save",
+  "updated": "2026-11-10T17:00Z"
+}

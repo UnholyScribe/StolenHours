@@ -1,0 +1,32 @@
+[
+  {
+    "needle": "GetMapID",
+    "off": 180799736,
+    "win": "..6C....p..J....X..I........................E..............................J....GetMapID........X..I........................E..............................J....GetRank.X..I........................E..........."
+  },
+  {
+    "needle": "SetMapID",
+    "off": 180800808,
+    "win": "SetLocation........J........................E..............................J....SetMapID...........J........................E...........................8..J....SetRank....J........................E..........."
+  },
+  {
+    "needle": "Map_000100",
+    "off": 181453464,
+    "win": "..qL............C.h.a.r.a.m.a.k.e.......PlantDungeon....PlantDungeon_BossRoom...Map_000100......M.a.p._.2.0.0.0.0.0.....Map_200000......M.a.p._.2.0.0.1.0.0.....Map_200100......room_battle.....room_treasure...M."
+  },
+  {
+    "needle": "Map_000100",
+    "off": 185980789,
+    "win": "...system_text_island_rate.costume_Cafe_Rank.......costume_Merchant_Rank...name_Map_000100_guild...name_gallery....name_vacant_house.......name_chara_house........P.-G....ev05_10900......flg_FP_p050070_04......"
+  },
+  {
+    "needle": "Map_000100",
+    "off": 185982173,
+    "win": "ji_0012....life_icon_gaiji_0013....life_icon_gaiji_0014....Map_000101......WorldMap_000100.WorldMap_000101.WorldMap_100100.WorldMap_100101.WorldMap_100301.Map_100400......WorldMap_100400.Map_100500......WorldMa"
+  },
+  {
+    "needle": "Map_MyHouse",
+    "off": 179296776,
+    "win": "...J.......................................F....@..F....X..J......iL............Map_MyHouse.....flg_guild_house_grade_up........Map_500001......Map_500002......mjfp_to_Map_500002......mjfp_to_Map_500001......Map"
+  }
+]

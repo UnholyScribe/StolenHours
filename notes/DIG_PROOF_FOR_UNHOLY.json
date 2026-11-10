@@ -1,0 +1,7 @@
+{
+  "for": "Unholy when on Base Camp",
+  "fastest_proof": "In MapCraft with Hagram: Dig one land cell at Z=-150, quit+save. Loom diffs backup vs new for land\u2192water + Z. No CALL needed.",
+  "optional": "PileUp one cell then Dig it back; Shave one water cell for slant-bridge IsShaveWater.",
+  "playbook": "sandbox/dig_proof_playbook.json",
+  "updated": "2026-11-10T15:06Z"
+}
