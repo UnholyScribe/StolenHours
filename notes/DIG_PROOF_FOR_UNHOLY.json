@@ -1,7 +1,15 @@
 {
   "for": "Unholy when on Base Camp",
-  "fastest_proof": "In MapCraft with Hagram: Dig one land cell at Z=-150, quit+save. Loom diffs backup vs new for land\u2192water + Z. No CALL needed.",
-  "optional": "PileUp one cell then Dig it back; Shave one water cell for slant-bridge IsShaveWater.",
+  "confirmed_2026_11_10": {
+    "Craft_A_flat": "adds elevated land_obj (iz+1 / Z step)",
+    "Excavate_X_elevated": "peels that land_obj; does NOT become water_obj",
+    "flat_Excavate": "gray — Craft(A) live",
+    "title_screen_save": "hash changes — enough for Loom diffs"
+  },
+  "still_open": "Hagram Water category → one cell → title save (water_obj UI path)",
+  "fastest_next": "Hagram → Water → place one cell → title save. Loom diffs.",
+  "optional": "Shave one water cell for slant-bridge IsShaveWater.",
   "playbook": "sandbox/dig_proof_playbook.json",
-  "updated": "2026-11-10T15:06Z"
+  "dumps": "agents/Loom/sandbox/dig_baseline/",
+  "updated": "2026-11-10T19:35Z"
 }

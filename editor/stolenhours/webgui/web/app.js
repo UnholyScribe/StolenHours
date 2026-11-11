@@ -1884,7 +1884,9 @@ async function islTerrain() {
     <div class="row" style="margin-top:14px">
       <button class="btn btn-cream" id="isl-reset-shave" ${t.shaved ? "" : "disabled"}>Reset all Shave flags</button>
     </div>
-    <div class="note" style="margin-top:10px">Pile Up / Dig = <code>Location.Z ±150</code> (Loom save probe).
+    <div class="note" style="margin-top:10px">Pile Up = Craft(A) raise; Dig = Excavate(X) peel elevated
+      (<code>Location.Z</code> steps −150/0/150 via grid iz — Loom CONFIRMED). Flat Ground: Excavate gray.
+      Water cells = Hagram <b>Water</b> category (not Dig) — HOLD until live proof.
       Shave toggles the bevel flag the game uses for Scraped corner patterns.</div>`;
 
   $$("[data-ttool]").forEach((b) => (b.onclick = () => {
@@ -2524,14 +2526,26 @@ async function islHouse() {
       const rows = wallsFloors.filter((r) => !q || `${r.name} ${r.itemId} ${r.designId}`.toLowerCase().includes(q));
       const walls = rows.filter((r) => r.Type === 117);
       const floors = rows.filter((r) => r.Type === 118);
+      const cur = (v.theme && v.theme.designId) || (v.area && v.area.designId) || "";
       cat.innerHTML = `
-        <div class="note" style="margin:4px 0 8px">Game Type 117/118 via IndoorDesigen (Loom 74/74). Apply-to-room write still UNVERIFIED — catalog + mesh paths ready.</div>
-        <div class="muted" style="padding:4px 0">Wallpaper (${walls.length})</div>
-        ${walls.map((r) => `<div class="vil-list-row" title="${h((r.meshes || [])[0] || "")}">
-          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></div>`).join("") || `<div class="muted">None.</div>`}
-        <div class="muted" style="padding:8px 0 4px">Floors (${floors.length})</div>
-        ${floors.map((r) => `<div class="vil-list-row" title="${h((r.meshes || [])[0] || "")}">
-          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></div>`).join("") || `<div class="muted">None.</div>`}`;
+        <div class="note" style="margin:4px 0 8px">Preview Apply swaps viewer theme from Loom walls_floors (Diff/Nml/Rse).
+          Write-to-save still UNVERIFIED — HOLD. Active: <code>${h(cur || "ide_thatch_00")}</code></div>
+        <div class="muted" style="padding:4px 0">Wallpaper (${walls.length}) — click to preview</div>
+        ${walls.map((r) => `<button class="vil-list-row ${r.designId === cur ? "on" : ""}" data-theme="${h(r.designId || "")}" title="${h((r.meshes || [])[0] || "")}">
+          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></button>`).join("") || `<div class="muted">None.</div>`}
+        <div class="muted" style="padding:8px 0 4px">Floors (${floors.length}) — click to preview</div>
+        ${floors.map((r) => `<button class="vil-list-row ${r.designId === cur ? "on" : ""}" data-theme="${h(r.designId || "")}" title="${h((r.meshes || [])[0] || "")}">
+          <span>${h(r.name)}</span><small>${h(r.designId || r.itemId)}</small></button>`).join("") || `<div class="muted">None.</div>`}`;
+      $$("[data-theme]").forEach((b) => (b.onclick = async () => {
+        const did = b.dataset.theme;
+        if (!did || !window.Village3D) return;
+        const theme = await attempt(() => api("village_theme", { design_id: did }));
+        if (!theme) return;
+        window.Village3D.applyTheme(theme);
+        if (v.theme) Object.assign(v.theme, theme);
+        if (v.area) v.area.designId = did;
+        side();
+      }));
     } else if (S.vilHTab === "houses") {
       cat.innerHTML = `
         <div class="muted" style="padding:4px 0">On your island</div>
@@ -2582,6 +2596,7 @@ async function islHouse() {
     await window.Village3D.show(host, placed, {
       mode: "indoor",
       area: v.area,
+      theme: v.theme || null,
       selected: S.vilHSel,
       placeW: sz.w,
       placeD: sz.d,

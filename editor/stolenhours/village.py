@@ -58,6 +58,149 @@ MAP_ID_NUMERIC = {
     "Map_MyHouse": 535592167,
     "NPCEmptyRoom_00": 616711470,
 }
+# Loom M2: pack is sole mesh resolution source for Village/island viewer (read-only).
+PACK_FILE = paths.UI_ASSET_DIR / "village" / "basecamp_pack.json"
+_VOXEL_XY = 50
+_VOXEL_Z = 150
+ISLAND_VOXEL = {"xy": _VOXEL_XY, "z": _VOXEL_Z, "land_z": (-150, 0, 150), "water_z": (-150,)}
+# objStatusBitFlag — Shave CONFIRMED; Put / Planned POSSIBLE (Loom M2).
+STATUS_BITFLAGS = {
+    "shave": {"bit": 0, "mask": 1, "confidence": "CONFIRMED"},
+    "put": {"bit": 1, "mask": 2, "confidence": "POSSIBLE"},
+    "planned_construct": {"bit": 2, "mask": 4, "confidence": "POSSIBLE"},
+}
+
+
+def load_pack(path: Path | None = None) -> dict:
+    p = path or PACK_FILE
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _build_mesh_index(pack: dict | None = None) -> dict[str, dict]:
+    """craftObjId → mesh/glb keys from Loom pack only (M2 read-only resolve)."""
+    pack = pack if pack is not None else load_pack()
+    out: dict[str, dict] = {}
+    furn = pack.get("furniture") or {}
+    with_glb = furn.get("with_glb") or {}
+    if isinstance(with_glb, dict):
+        for rows in with_glb.values():
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                cid = row.get("craftObjId")
+                if not cid:
+                    continue
+                out[cid] = {
+                    "craftObjId": cid,
+                    "source": "furniture",
+                    "name": row.get("name"),
+                    "bp": row.get("bp"),
+                    "meshes": list(row.get("meshes") or []),
+                    "glbs": list(row.get("glbs_on_disk") or []),
+                }
+    # Terrain LAND variants (ids only in pack; visuals named *_visual).
+    tv = pack.get("terrain_obj_variants") or {}
+    ids = tv.get("ids") if isinstance(tv, dict) else None
+    if isinstance(ids, list):
+        for cid in ids:
+            out.setdefault(cid, {
+                "craftObjId": cid,
+                "source": "terrain",
+                "name": cid,
+                "bp": None,
+                "meshes": [],
+                "glbs": [],
+                "visual": f"{cid}_visual" if not str(cid).endswith("_visual") else cid,
+            })
+    return out
+
+
+def resolve_pack_mesh(craft_obj_id: str, pack: dict | None = None) -> dict | None:
+    """Read-only mesh resolve for Village/island viewer. Pack is sole source."""
+    cid = str(craft_obj_id or "")
+    if not cid or cid in EMPTY_IDS:
+        return None
+    idx = _build_mesh_index(pack)
+    hit = idx.get(cid)
+    if hit:
+        return dict(hit)
+    return None
+
+
+def _mesh_tex_stem(mesh_path: str | None) -> str | None:
+    """'/Game/.../mdl_cft010001_00' → 'tex_cft010001_00'."""
+    if not mesh_path:
+        return None
+    name = Path(str(mesh_path).split(".")[0]).name
+    if name.startswith("mdl_"):
+        return "tex_" + name[4:]
+    if name.startswith("tex_"):
+        return name
+    return None
+
+
+def theme_for_design(design_id: str | None, pack: dict | None = None) -> dict:
+    """walls_floors Type 117/118 → craft3d Diff/Nml/Rse paths for House viewer (Loom P0)."""
+    pack = pack if pack is not None else load_pack()
+    did = str(design_id or "")
+    if not did or did in EMPTY_IDS:
+        did = "ide_thatch_00"
+    rows = ((pack.get("walls_floors") or {}).get("rows") or [])
+    wall = next((r for r in rows if r.get("designId") == did and int(r.get("Type") or 0) == 117), None)
+    floor = next((r for r in rows if r.get("designId") == did and int(r.get("Type") or 0) == 118), None)
+    if wall is None:
+        wall = next((r for r in rows if r.get("designId") == did), None)
+    if floor is None:
+        floor = next((r for r in rows if r.get("designId") == did and r is not wall), None)
+
+    def _slot(row: dict | None, kind: str) -> dict:
+        meshes = list((row or {}).get("meshes") or [])
+        stem = _mesh_tex_stem(meshes[0] if meshes else None)
+        out = {
+            "designId": did,
+            "kind": kind,
+            "itemId": (row or {}).get("itemId"),
+            "name": (row or {}).get("name"),
+            "indoorFolder": (row or {}).get("indoor_folder"),
+            "meshes": meshes,
+            "stem": stem,
+            "dif": f"t/{stem}_dif.webp" if stem else None,
+            "nml": f"t/{stem}_nml.webp" if stem else None,
+            "rse": f"t/{stem}_rse.webp" if stem else None,
+        }
+        if kind == "floor":
+            # Loom CONFIRMED mat_cft020001_00 Vertex_Color 0.25
+            out["vertexColor"] = [0.25, 0.25, 0.25, 1.0]
+            out["normalPower"] = 0.5
+        else:
+            out["vertexColor"] = [1.0, 1.0, 1.0, 1.0]
+            out["normalPower"] = 1.0
+        return out
+
+    return {
+        "designId": did,
+        "wall": _slot(wall, "wall"),
+        "floor": _slot(floor, "floor"),
+        "parent": "basemat_obj_opq_00",
+    }
+
+
+def indoor_design_id(area: dict) -> str | None:
+    """Prefer area defaultIndoorDesignId, else first childIndoorPartrsInfoArray designId."""
+    raw = area.get("defaultIndoorDesignId")
+    name = _name(raw) if not isinstance(raw, str) else (None if raw in EMPTY_IDS else raw)
+    if name:
+        return name
+    for child in area.get("childIndoorPartrsInfoArray") or []:
+        n = _name(child.get("designId"))
+        if n:
+            return n
+    return None
 
 
 def extract(force: bool = False) -> None:
@@ -242,8 +385,17 @@ def build(out: Path | None = None, log=print) -> dict:
         "buildings": pack.get("buildings") or {},
         "landCells": pack.get("land_cells") or [],
         "furnitureCoverage": pack.get("furniture_coverage") or {},
+        "furniturePack": pack.get("furniture") or {},
         "indoorParts": pack.get("indoor_parts_meshes") or {},
         "plannedConstruct": pack.get("planned_construct") or [],
+        "terrainObjVariants": pack.get("terrain_obj_variants") or {},
+        "fenceHedgeVpc": pack.get("fence_hedge_vpc") or {},
+        "waterVpc": pack.get("water_vpc") or {},
+        "bridgeVpc": pack.get("bridge_vpc") or {},
+        "mapidLookup": pack.get("mapid_lookup") or dict(MAP_ID_NUMERIC),
+        "islandVoxel": dict(ISLAND_VOXEL),
+        "statusBitflags": dict(STATUS_BITFLAGS),
+        "meshIndex": _build_mesh_index(pack),
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "craft.json").write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -573,6 +725,8 @@ class Village:
             })
 
         stock = self.inv_stock(sf)
+        design_id = indoor_design_id(area) if kind == "indoor" else None
+        theme = theme_for_design(design_id) if kind == "indoor" else None
         return {
             "mapId": map_id,
             "areaList": list_name,
@@ -587,7 +741,9 @@ class Village:
                 "origin": list(origin),
                 "numericMapId": num_map,
                 "location": list(area.get("Location") or [0, 0, 0]),
+                "designId": design_id,
             },
+            "theme": theme,
             "placed": placed,
             "houses": houses,
             "inventory": {k: v["stock"] for k, v in stock.items()},
@@ -839,7 +995,11 @@ class Village:
         return {"ix": ix, "iy": iy, "iz": new_iz, "handle": handle, "h": new_iz}
 
     def terrain_lower(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE) -> dict:
-        """Hagram Dig: remove top tier (−150 Z). At iz=0 land→water. Loom STRONGLY SUPPORTED."""
+        """Hagram Excavate/Dig: peel top elevated land_obj (−1 iz). Loom CONFIRMED 2026-11-10.
+
+        Live: Excavate gray on flat Ground; peels elevated only — does NOT become water_obj.
+        Water cells come from Hagram Water category (STRONGLY SUPPORTED) — HOLD until live proof.
+        """
         list_name, area = self.find_area(sf, map_id, "map")
         layers = self._terrain_layers_at(sf, area, ix, iy)
         if not layers:
@@ -848,12 +1008,9 @@ class Village:
         if top["iz"] > 0:
             self.remove(sf, top["handle"], free=True)
             return {"ix": ix, "iy": iy, "removedIz": top["iz"], "h": top["iz"] - 1}
-        # Ground tier: land → water (reveal water plane); water stays.
-        if top["cid"] == "land_obj":
-            top["obj"]["craftObjId"] = "water_obj"
-            sf.dirty = True
-            return {"ix": ix, "iy": iy, "removedIz": 0, "h": 0, "surface": "water"}
-        raise SaveFileError("already at water level")
+        raise SaveFileError(
+            "Excavate is peel-only on elevated land (flat Ground is gray in-game); "
+            "water uses Hagram Water — not Dig-at-floor")
 
     def terrain_shave(self, sf: SaveFile, ix: int, iy: int, map_id: str = MAP_BASE,
                       on: bool | None = None) -> dict:

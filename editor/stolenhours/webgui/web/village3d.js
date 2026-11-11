@@ -48,6 +48,12 @@ function yawToQuat(rot, outdoor = false) {
 /** Wallpaper atlas: 16 vertical slats, chevron crown at V=1, wainscot at V=0. */
 const WALL_SLAT_BASE = 16;
 const WALL_TARGET_SLATS = 11; // ~10–12 broad slats across the back wall in-game
+// Default Tropical / ide_thatch_00 — overridden by save designId via applyTheme().
+let activeTheme = {
+  designId: "ide_thatch_00",
+  wall: { dif: "t/tex_cft010001_00_dif.webp", nml: "t/tex_cft010001_00_nml.webp", rse: "t/tex_cft010001_00_rse.webp", vertexColor: [1, 1, 1, 1], normalPower: 1 },
+  floor: { dif: "t/tex_cft020001_00_dif.webp", nml: "t/tex_cft020001_00_nml.webp", rse: "t/tex_cft020001_00_rse.webp", vertexColor: [0.25, 0.25, 0.25, 1], normalPower: 0.5 },
+};
 
 function craftTex(rel, colorSpace = THREE.SRGBColorSpace, base = BASE) {
   if (!rel) return null;
@@ -248,16 +254,145 @@ function loadShellTex(rel, repeatU = 1, repeatV = 1, {
   return t;
 }
 
+function themeSlotTex(rel, { wrapS = THREE.RepeatWrapping, wrapT = THREE.RepeatWrapping, repeatU = 1, repeatV = 1, colorSpace = THREE.SRGBColorSpace } = {}) {
+  if (!rel) return null;
+  const t = craftTex(rel, colorSpace);
+  if (!t) return null;
+  t.wrapS = wrapS;
+  t.wrapT = wrapT;
+  t.repeat.set(repeatU, repeatV);
+  t.flipY = true;
+  return t;
+}
+
 function wallpaperTex(wallLenM) {
-  // Horizontal: density so ~WALL_TARGET_SLATS span the north wall; scale with length.
-  const northLen = 5.5; // typical My House (N−1)×cell visual width
+  const northLen = 5.5;
   const slats = WALL_TARGET_SLATS * (wallLenM / northLen);
   const repeatU = Math.max(0.25, slats / WALL_SLAT_BASE);
-  // Vertical: clamp — one wallpaper sheet floor→ceiling (chevron at top, wainscot at base).
+  const theme = themeSlotTex(activeTheme.wall?.dif, {
+    wrapS: THREE.RepeatWrapping, wrapT: THREE.ClampToEdgeWrapping, repeatU, repeatV: 1,
+  });
+  if (theme) return theme;
   return loadShellTex("myhouse_wall.png", repeatU, 1.0, {
     wrapS: THREE.RepeatWrapping,
     wrapT: THREE.ClampToEdgeWrapping,
   });
+}
+
+function themeFloorTex(repeat = 1.35 * 0.22) {
+  const theme = themeSlotTex(activeTheme.floor?.dif, {
+    wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, repeatU: repeat, repeatV: repeat,
+  });
+  if (theme) return theme;
+  const floorMap = new THREE.TextureLoader().load(BASE + "myhouse_floor.png");
+  floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
+  floorMap.repeat.set(repeat, repeat);
+  floorMap.colorSpace = THREE.SRGBColorSpace;
+  return floorMap;
+}
+
+function themeShellMat(map, slot = {}) {
+  const vc = slot.vertexColor || [1, 1, 1, 1];
+  const np = slot.normalPower != null ? slot.normalPower : 1;
+  const mat = new THREE.MeshStandardMaterial({
+    map: map || null,
+    color: new THREE.Color(vc[0], vc[1], vc[2]), // floor Vertex_Color ≈ 0.25 (Loom CONFIRMED)
+    roughness: 0.85,
+    metalness: 0.02,
+    side: THREE.DoubleSide,
+  });
+  if (slot.nml) {
+    const n = themeSlotTex(slot.nml, {
+      wrapS: map?.wrapS ?? THREE.RepeatWrapping,
+      wrapT: map?.wrapT ?? THREE.RepeatWrapping,
+      repeatU: map?.repeat?.x || 1,
+      repeatV: map?.repeat?.y || 1,
+      colorSpace: THREE.NoColorSpace,
+    });
+    if (n) {
+      mat.normalMap = n;
+      mat.normalScale = new THREE.Vector2(np, np);
+    }
+  }
+  // RMS_Texture (*_rse) → roughnessMap stand-in (R channel); metalness kept low.
+  if (slot.rse) {
+    const r = themeSlotTex(slot.rse, {
+      wrapS: map?.wrapS ?? THREE.RepeatWrapping,
+      wrapT: map?.wrapT ?? THREE.RepeatWrapping,
+      repeatU: map?.repeat?.x || 1,
+      repeatV: map?.repeat?.y || 1,
+      colorSpace: THREE.NoColorSpace,
+    });
+    if (r) {
+      mat.roughnessMap = r;
+      mat.roughness = 1.0;
+    }
+  }
+  return mat;
+}
+
+function applyTheme(theme) {
+  if (!theme) return activeTheme;
+  activeTheme = {
+    designId: theme.designId || activeTheme.designId,
+    wall: { ...activeTheme.wall, ...(theme.wall || {}) },
+    floor: { ...activeTheme.floor, ...(theme.floor || {}) },
+  };
+  if (!room) return activeTheme;
+  // Live-refresh shell without full rebuild (catalog Apply preview).
+  room.traverse((o) => {
+    if (o.userData?.roomWallpaper && o.material) {
+      const along = o.geometry?.parameters?.width || 5.5;
+      o.material.dispose?.();
+      o.material = themeShellMat(wallpaperTex(along), activeTheme.wall);
+    }
+    if (o.userData?.roomFloor && o.material) {
+      const floorRepeat = 1.35 * 0.22;
+      o.material.dispose?.();
+      o.material = themeShellMat(themeFloorTex(floorRepeat), activeTheme.floor);
+    }
+  });
+  return activeTheme;
+}
+
+/** Loom room_env00 indoor lights (CONFIRMED): warm Dir 3 + ceiling Sphere 8. */
+function ensureIndoorLights() {
+  let pack = scene.userData.indoorLights;
+  if (pack) {
+    pack.dir.visible = true;
+    pack.sphere.visible = true;
+    return pack;
+  }
+  const dir = new THREE.DirectionalLight(0xe6d1ba, 3.0);
+  dir.position.set(4, 8, 2);
+  dir.target.position.set(0, 0, 0);
+  scene.add(dir);
+  scene.add(dir.target);
+  const sphere = new THREE.PointLight(0xffffff, 8.0, 0, 0);
+  sphere.position.set(0, 3.5, 0);
+  scene.add(sphere);
+  pack = { dir, sphere };
+  scene.userData.indoorLights = pack;
+  return pack;
+}
+
+function setIndoorLightMode(on) {
+  const outdoor = scene.userData.villageLights || {};
+  for (const k of ["ambient", "sun", "fill", "hemi"]) {
+    const L = outdoor[k];
+    if (!L) continue;
+    const base = L.userData._base ?? L.intensity;
+    L.intensity = on
+      ? (k === "ambient" ? 0.28 : k === "hemi" ? 0.18 : 0.22)
+      : base;
+  }
+  if (on) {
+    ensureIndoorLights();
+    if (scene.fog) scene.fog.far = 80;
+  } else if (scene.userData.indoorLights) {
+    scene.userData.indoorLights.dir.visible = false;
+    scene.userData.indoorLights.sphere.visible = false;
+  }
 }
 
 function setup() {
@@ -299,6 +434,10 @@ function setup() {
   scene.add(fill);
   const hemi = new THREE.HemisphereLight(0xc8e6ff, 0x9a7a55, 0.42);
   scene.add(hemi);
+  ambient.userData._base = ambient.intensity;
+  sun.userData._base = sun.intensity;
+  fill.userData._base = fill.intensity;
+  hemi.userData._base = hemi.intensity;
   scene.userData.villageLights = { ambient, sun, fill, hemi };
   const el = renderer.domElement;
   // Capture phase so furniture pick runs before OrbitControls steals the gesture.
@@ -497,20 +636,10 @@ function buildIndoorRoom(area) {
   const d = uy * cell;
   // Visual wall height (~2.5m). Craft area Height×voxelZ is the placeable volume, not the shell.
   const h = 2.55;
-  // Honey herringbone — chunky boards, ~7–8 chevron peaks across the room (was 1.35 → ×0.25).
-  // Tuned slightly lower so the PNG's busy pattern still reads as broad planks.
+  // Theme Diff/Nml/Rse MeshStandard (Loom basemat_obj_opq_00) — never myhouse PNG MeshBasic.
   const floorRepeat = 1.35 * 0.22;
-  const floorMap = new THREE.TextureLoader().load(BASE + "myhouse_floor.png", (t) => {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(floorRepeat, floorRepeat);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    t.needsUpdate = true;
-  });
-  floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
-  floorMap.repeat.set(floorRepeat, floorRepeat);
-  floorMap.colorSpace = THREE.SRGBColorSpace;
-  const floorMat = new THREE.MeshBasicMaterial({ map: floorMap, color: 0xffffff });
+  const floorMap = themeFloorTex(floorRepeat);
+  const floorMat = themeShellMat(floorMap, activeTheme.floor);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
@@ -521,7 +650,7 @@ function buildIndoorRoom(area) {
   // Shell: N/E/W — thick fill + interior wallpaper plane (UV0: V=0 floor → V=1 ceiling).
   // South: continuous perimeter sill (no doorway boolean) + exterior threshold walkway.
   const wallT = cell * 0.4;
-  const fillMat = new THREE.MeshBasicMaterial({ color: 0x5a4030 });
+  const fillMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.92, metalness: 0.02 });
   const mkWall = (along, hx, hz, rotY) => {
     // Solid thickness (bury edge furniture); wallpaper is a separate inward face.
     const fill = new THREE.Mesh(
@@ -539,7 +668,7 @@ function buildIndoorRoom(area) {
     // PlaneGeometry UV: U along width, V along height (0 at bottom, 1 at top) — no world-height multiply.
     const paper = new THREE.Mesh(
       new THREE.PlaneGeometry(along, h),
-      new THREE.MeshBasicMaterial({ map: wallpaperTex(along), side: THREE.DoubleSide }),
+      themeShellMat(wallpaperTex(along), activeTheme.wall),
     );
     paper.renderOrder = 1;
     // Sit just inside the fill's interior face. Plane default normal = +Z.
@@ -593,6 +722,8 @@ function buildIndoorRoom(area) {
   threshold.position.set(0, 0.03, d / 2 + sillD + thrD / 2 + cell * 0.06);
   threshold.userData.roomShell = true;
   room.add(threshold);
+
+  setIndoorLightMode(true);
 
   // windows on interior faces of left / right walls
   const winMat = new THREE.MeshStandardMaterial({ color: 0x6a8aaa, roughness: 0.35, transparent: true, opacity: 0.85 });
@@ -1926,6 +2057,7 @@ async function show(container, placed, opts = {}) {
   terrainTool = opts.terrainTool || null;
   selected = opts.selected ?? null;
   mode = opts.mode || "indoor";
+  if (opts.theme) applyTheme(opts.theme);
   placeSize = { w: opts.placeW || 1, d: opts.placeD || 1 };
   drag = null;
   if (ctl) ctl.enabled = true;
@@ -1942,6 +2074,7 @@ async function show(container, placed, opts = {}) {
     islandEnv = null;
   }
   if (mode === "outdoor") {
+    setIndoorLightMode(false);
     size = buildOutdoorTerrain(opts);
     // Base Camp glTFs (mountain, beach, sea) — on unless opts.loadEnv === false.
     if (opts.loadEnv !== false) {
@@ -2267,6 +2400,8 @@ window.Village3D = {
   getTerrainGrid() { return craftTerrain?.grid || null; },
   validateFootprintAt, setExploreMode,
   isExploreMode() { return !!exploreMode; },
+  applyTheme,
+  getTheme() { return activeTheme; },
   setWallpaper(texRel) {
     if (!room) return;
     room.traverse((o) => {

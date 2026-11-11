@@ -633,6 +633,24 @@ class Backend:
         with self.lock:
             return self._village().terrain_grid(self._need(), map_id=str(map_id))
 
+    def api_village_mesh(self, craft_obj_id: str = "") -> dict:
+        """Read-only pack mesh resolve (Loom M2). Pack is sole source; no save write."""
+        from stolenhours import village as vilmod
+        hit = vilmod.resolve_pack_mesh(str(craft_obj_id or ""))
+        return {
+            "craftObjId": craft_obj_id,
+            "found": hit is not None,
+            "mesh": hit,
+            "voxel": dict(vilmod.ISLAND_VOXEL),
+            "mapIdNumeric": dict(vilmod.MAP_ID_NUMERIC),
+            "statusBitflags": dict(vilmod.STATUS_BITFLAGS),
+        }
+
+    def api_village_theme(self, design_id: str = "ide_thatch_00") -> dict:
+        """Read-only IndoorDesigen theme (walls_floors → Diff/Nml/Rse). Preview only."""
+        from stolenhours import village as vilmod
+        return vilmod.theme_for_design(str(design_id or "ide_thatch_00"))
+
     def api_village_edit(self, action: str, free: bool = False, craft_obj_id: str | None = None,
                          handle: int | None = None, map_id: str = "Map_000100",
                          location: list | None = None, rotation: list | None = None,

@@ -21,4 +21,4 @@ Read `README.md`, `docs\FINDINGS.md` and `notes\PROGRESS.md` first. `docs\BLUEPR
 - Unholy launches the game himself.
 - Everything stays local; nothing is pushed online unless Unholy asks.
 - Don't run a file in the same parallel batch as the edit that writes it.
-- Peer **Loom** (`agents\Loom\`, Railroad station Loom) owns engine RE (sandbox + Cipher Bench). Hand Live Map / mailbox engine questions to Loom; Loom does not rewrite Tock's editor without Unholy OK.
+- Peer **Loom** (`agents\Loom\`, Railroad station Loom) is **Chief RE Architect** for the Base Camp / island track: shared island schema, CONFIRMED dumps, graphics packs, physics research. **Tock** owns editor write path + Live hook/sync. Agree M2 shared island model with Loom before island reconstruction code. Loom does not four-way rewrite Tock's editor without Unholy OK. Org: `agents\Loom\docs\BASE_CAMP_ISLAND_TRACK.md`.

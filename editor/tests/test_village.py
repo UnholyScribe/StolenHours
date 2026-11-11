@@ -114,3 +114,42 @@ def test_place_indoor_free(vil, loaded):
     assert len(st2["placed"]) == before + 1
     vil.remove(sf, placed["handle"], free=True)
     assert len(vil.state(sf, MAP_MYHOUSE, "indoor")["placed"]) == before
+
+
+def test_map_id_numeric_trio():
+    assert village.MAP_ID_NUMERIC[MAP_BASE] == 1807587003
+    assert village.MAP_ID_NUMERIC[MAP_MYHOUSE] == 535592167
+    assert village.MAP_ID_NUMERIC["NPCEmptyRoom_00"] == 616711470
+    assert village.ISLAND_VOXEL["xy"] == 50 and village.ISLAND_VOXEL["z"] == 150
+    assert village.STATUS_BITFLAGS["shave"]["mask"] == 1
+
+
+def test_resolve_pack_mesh_readonly():
+    if not village.PACK_FILE.exists():
+        pytest.skip("basecamp_pack.json not present")
+    hit = village.resolve_pack_mesh("obj_ico01020010")
+    assert hit and hit["source"] == "furniture"
+    assert hit["meshes"] or hit["glbs"]
+    land = village.resolve_pack_mesh("land_obj")
+    assert land and land["source"] == "terrain"
+    assert village.resolve_pack_mesh("None") is None
+    assert village.resolve_pack_mesh("") is None
+
+
+def test_theme_for_design_thatch():
+    if not village.PACK_FILE.exists():
+        pytest.skip("basecamp_pack.json not present")
+    th = village.theme_for_design("ide_thatch_00")
+    assert th["designId"] == "ide_thatch_00"
+    assert th["wall"]["dif"] and "cft010001" in th["wall"]["dif"]
+    assert th["floor"]["dif"] and "cft020001" in th["floor"]["dif"]
+    assert th["floor"]["vertexColor"][0] == pytest.approx(0.25)
+    assert th["wall"]["rse"] and th["floor"]["rse"]
+
+
+def test_indoor_design_id_from_sample(vil, loaded):
+    sf = fresh(loaded)
+    st = vil.state(sf, MAP_MYHOUSE, "indoor")
+    assert st["area"].get("designId") in (None, "ide_thatch_00") or str(st["area"].get("designId")).startswith("ide_")
+    if st.get("theme"):
+        assert st["theme"]["wall"].get("dif")

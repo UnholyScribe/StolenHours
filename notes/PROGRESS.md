@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-11-10: Ship 0.6.3 (Tock)
+- House P0 theme (designId Diff/Nml/Rse + floor Vertex_Color + room_env00) + Dig peel-only + Apply preview.
+- pytest 142; portable_check clean.
+
+## 2026-11-10: Emperor House P0 (tick 23) (Tock)
+- Loom WORK: game-identical House look. Shipped P0: save `defaultIndoorDesignId` → `theme_for_design`
+  (walls_floors 117/118); Diff+Nml+**Rse** + floor Vertex_Color 0.25; room_env00 lights kept;
+  Walls&floors catalog **Apply preview** (`api_village_theme`); handoff RSE copied into craft3d/t.
+- Not yet: IndoorDesigen Wall/Floor glb parts (still planes), real window/door BPs, outdoor P2 sun/map mats.
+- HOLD: wallpaper write-to-save, Dig water, weapon-skin.
+
+## 2026-11-10: Dig CONFIRMED + House theme pass (tick 22) (Tock)
+- Loom: Craft raise + Excavate peel CONFIRMED; Dig≠water. Editor Dig no longer land→water at floor.
+- House look step 1: Tropical `ide_thatch_00` wall/floor dif+nml via MeshStandard + room_env00 lights
+  (kill myhouse PNG MeshBasic default). Water Hagram + full IndoorDesigen parts still open.
+- HOLDs: Dig-sync water-fill, MapCraft CALL, weapon-skin. Apply-to-room write still UNVERIFIED.
+
+## 2026-11-10: Dig UI note (tick 21) (Tock)
+- Loom live Base Camp: Excavate gray on flat Ground, live on elevated; Dig-at-floor→water
+  may be UI-gated. Updated Island Dig note + `DIG_PROOF_FOR_UNHOLY.json`. HOLDs until Dig proof banked.
+
+## 2026-11-10: M2 agree + pack mesh resolve (Tock)
+- Loom tasking (Unholy): read `ISLAND_SHARED_MODEL_M2.md` — **AGREED** (mapId trio, XY=50/Z=150,
+  bitflags, pack-sole mesh source). No island reconstruction write until Dig proof.
+- Wired `resolve_pack_mesh` + `api_village_mesh` (read-only). craft.json `meshIndex` 1186 ids.
+- MAP_ID_NUMERIC already in 0.6.2. Weapon-skin / MapCraft CALL still HOLD.
+
 ## 2026-11-10: Ship 0.6.2 (Tock)
 - Unshipped after 0.6.1: full Loom `basecamp_pack_index` (89 keys vs 26 in EXE) + `MAP_ID_NUMERIC`
   trio in `village.py`. Reddit Decivre reply+DM done (PC/Steam only; asked Switch/mobile intent).
