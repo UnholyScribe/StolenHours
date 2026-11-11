@@ -147,6 +147,13 @@ def test_theme_for_design_thatch():
     assert th["floor"]["dif"] and "cft020001" in th["floor"]["dif"]
     assert th["floor"]["vertexColor"][0] == pytest.approx(0.25)
     assert th["wall"]["rse"] and th["floor"]["rse"]
+    assert th.get("texFallback00") is True
+    prev = village.design_preview("ide_thatch_00")
+    assert prev["designId"] == "ide_thatch_00"
+    assert prev.get("texFallback00") is True
+    if prev.get("glbsCraft3d"):
+        assert prev["wallShell"] and prev["wallShell"].startswith("m/")
+        assert th["wall"]["shell"] == prev["wallShell"]
 
 
 def test_indoor_design_id_from_sample(vil, loaded):

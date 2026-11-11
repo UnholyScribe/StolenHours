@@ -149,7 +149,8 @@ Open questions (each needs one in-game check by Unholy):
 
 | Question | Answer | Status |
 |---|---|---|
-| Placeable catalog | `GDSItemCraftData` (1483, Category 70 → `invCraft`) → `GDSCraftObjData` (1629) → `GDSCraftObjVisualData` (Size + ObjBP). Editor `game/village/craft.json`: 1581 placeables, 114 houses. | Verified (tables) |
+| Placeable catalog | `GDSItemCraftData` (1483, Category 70 → `invCraft`) → `GDSCraftObjData` (1629) → `GDSCraftObjVisualData` (Size + ObjBP). `Size` uses **Width/Depth/Height** voxels (not XYZ) — Loom CONFIRMED 2026-11-11; place ghost footprint. Editor `game/village/craft.json`: 1581 placeables, 114 houses. | Verified (tables) |
+| IndoorDesigen mesh | Design `partsInfoArray.Path` → IndoorDesigen BP → StaticMesh → `Graphics/3D/Craft/cft*/**/mdl_cft*.glb`. 307/307 glb. Variant `mdl_cft*_NN` (NN≠00) binds Tex/Mat from `cft*/00` (CONFIRMED). Editor: `house_design_preview.json` + `theme_for_design`/`design_preview` + craft3d shells. | CONFIRMED (preview); full room part layout UNVERIFIED |
 | Craft area lists | `m_CraftAreaStatus` map / outdoor / indoor / wall / ceiling (256 each). Base Camp map area 160×128×6, voxel 50×50×150. My House indoor 12×12×4, voxel 50×50×100. | Verified (save) |
 | Numeric `mapId` | `craftObjStatusP.mapId` = `zlib.crc32(mapId.encode("utf-32-le")) & 0xFFFFFFFF` (Loom CONFIRMED 2026-11-10). Trio + `NPCEmptyRoom_01`→`2625512011` verified. Earlier UTF-8/FNV/Murmur/UE-FName attempts were wrong encoding. Editor: `village.encode_map_id`. | CONFIRMED |
 | gridIdx | Outdoor and indoor both use ix-major: `ix * Width + iy + iz * Width * Depth`. (Earlier indoor iy-major note was wrong — MyHouse Tropical Bed grid 25 + Wooden Bucket grid 10 confirm ix-major.) Location = origin + cell × voxel. Base Camp origin = land_obj at grid 0 `(-3150,-3950,-150)`. | Verified outdoor 6574 cells; indoor re-verified 2026-10-15 |

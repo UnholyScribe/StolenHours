@@ -151,8 +151,78 @@ def _mesh_tex_stem(mesh_path: str | None) -> str | None:
     return None
 
 
+def _village_asset(name: str) -> Path:
+    return paths.UI_ASSET_DIR / "village" / name
+
+
+def load_house_design_preview() -> dict:
+    p = _village_asset("house_design_preview.json")
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def load_house_paint_preview() -> dict:
+    p = _village_asset("house_paint_item_preview.json")
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _craft3d_glb(rel_or_name: str) -> str | None:
+    """Graphics/.../mdl_x.glb or mdl_x → craft3d-relative m/mdl_x.glb if present."""
+    name = Path(str(rel_or_name).replace("\\", "/")).name
+    if not name.endswith(".glb"):
+        name = f"{name}.glb"
+    if not name.startswith("mdl_"):
+        return None
+    root = paths.UI_ASSET_DIR / "craft3d" / "m" / name
+    if root.exists():
+        return f"m/{name}"
+    return None
+
+
+def design_preview(design_id: str | None) -> dict:
+    """Loom CONFIRMED IndoorDesigen → cft* glb list + craft3d paths (00 tex fallback)."""
+    did = str(design_id or "") or "ide_thatch_00"
+    raw = load_house_design_preview()
+    row = next((d for d in (raw.get("designs") or []) if d.get("design_id") == did), None)
+    glbs_ue = list((row or {}).get("glbs") or [])
+    meshes = list((row or {}).get("meshes") or [])
+    craft = []
+    for g in glbs_ue:
+        rel = _craft3d_glb(g)
+        if rel:
+            craft.append(rel)
+    # Prefer *_00 wall/floor shells for room drop-in when present.
+    wall_shell = next((c for c in craft if "/mdl_cft01" in f"/{c}" and c.endswith("_00.glb")), None)
+    floor_shell = next((c for c in craft if "/mdl_cft02" in f"/{c}" and c.endswith("_00.glb")), None)
+    if wall_shell is None:
+        wall_shell = next((c for c in craft if "mdl_cft01" in c), None)
+    if floor_shell is None:
+        floor_shell = next((c for c in craft if "mdl_cft02" in c), None)
+    return {
+        "designId": did,
+        "partsN": (row or {}).get("parts_n"),
+        "meshes": meshes,
+        "glbsUe": glbs_ue,
+        "glbsCraft3d": craft,
+        "wallShell": wall_shell,
+        "floorShell": floor_shell,
+        "texFallback00": True,
+        "parent": "basemat_obj_opq_00",
+        "confidence": raw.get("confidence") or "CONFIRMED",
+    }
+
+
 def theme_for_design(design_id: str | None, pack: dict | None = None) -> dict:
-    """walls_floors Type 117/118 → craft3d Diff/Nml/Rse paths for House viewer (Loom P0)."""
+    """walls_floors Type 117/118 → craft3d Diff/Nml/Rse + IndoorDesigen shell glbs (Loom)."""
     pack = pack if pack is not None else load_pack()
     did = str(design_id or "")
     if not did or did in EMPTY_IDS:
@@ -164,10 +234,16 @@ def theme_for_design(design_id: str | None, pack: dict | None = None) -> dict:
         wall = next((r for r in rows if r.get("designId") == did), None)
     if floor is None:
         floor = next((r for r in rows if r.get("designId") == did and r is not wall), None)
+    preview = design_preview(did)
 
     def _slot(row: dict | None, kind: str) -> dict:
         meshes = list((row or {}).get("meshes") or [])
         stem = _mesh_tex_stem(meshes[0] if meshes else None)
+        # Variant NN≠00 binds Tex/Mat from cft*/00 (Loom CONFIRMED).
+        if stem and not stem.endswith("_00"):
+            parts = stem.rsplit("_", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                stem = f"{parts[0]}_00"
         out = {
             "designId": did,
             "kind": kind,
@@ -179,6 +255,7 @@ def theme_for_design(design_id: str | None, pack: dict | None = None) -> dict:
             "dif": f"t/{stem}_dif.webp" if stem else None,
             "nml": f"t/{stem}_nml.webp" if stem else None,
             "rse": f"t/{stem}_rse.webp" if stem else None,
+            "shell": preview.get("wallShell" if kind == "wall" else "floorShell"),
         }
         if kind == "floor":
             # Loom CONFIRMED mat_cft020001_00 Vertex_Color 0.25
@@ -194,6 +271,8 @@ def theme_for_design(design_id: str | None, pack: dict | None = None) -> dict:
         "wall": _slot(wall, "wall"),
         "floor": _slot(floor, "floor"),
         "parent": "basemat_obj_opq_00",
+        "preview": preview,
+        "texFallback00": True,
     }
 
 
@@ -373,6 +452,20 @@ def build(out: Path | None = None, log=print) -> dict:
             pack = json.loads(pack_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             pack = {}
+    walls_floors = list((pack.get("walls_floors") or {}).get("rows") or [])
+    paint = load_house_paint_preview()
+    paint_by_item = {}
+    for bucket in ("walls_type117", "floors_type118"):
+        for row in paint.get(bucket) or []:
+            iid = row.get("itemId")
+            if iid:
+                paint_by_item[iid] = row
+    for row in walls_floors:
+        hit = paint_by_item.get(row.get("itemId")) or {}
+        if hit.get("preview_glbs"):
+            row["previewGlbs"] = list(hit["preview_glbs"])
+            row["previewMeshes"] = list(hit.get("preview_meshes") or [])
+            row["previewCraft3d"] = [p for g in row["previewGlbs"] if (p := _craft3d_glb(g))]
     data = {
         "objects": catalog,
         "houses": house_rows,
@@ -380,7 +473,12 @@ def build(out: Path | None = None, log=print) -> dict:
             {"id": MAP_BASE, "name": "Base Camp", "kind": "map"},
             {"id": MAP_MYHOUSE, "name": "My House", "kind": "indoor"},
         ],
-        "wallsFloors": (pack.get("walls_floors") or {}).get("rows") or [],
+        "wallsFloors": walls_floors,
+        "houseDesignPreview": {
+            "confidence": (load_house_design_preview() or {}).get("confidence"),
+            "designN": len((load_house_design_preview() or {}).get("designs") or []),
+            "texFallback00": True,
+        },
         "landmarks": pack.get("landmarks") or {},
         "terrainOps": pack.get("terrain") or {
             "voxel_z": 150, "base_z": -150, "shave_mask": 1,

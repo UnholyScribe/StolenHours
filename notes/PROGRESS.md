@@ -1,5 +1,10 @@
 # Progress
 
+## 2026-11-11: Ship 0.6.5 — IndoorDesigen mesh pass (Tock)
+- Loom dumps: 307/307 mesh index, house_design_preview, paint→glb, 00 tex fallback, brick/royal/thatch extracts, Size W/D/H CONFIRMED.
+- Village: `design_preview` + theme shell glbs + craft3d 00-tex aliases; wallsFloors `previewGlbs`. Dig write HOLD.
+- Transmorph A+B confirmed to Loom; Bag UI HOLD until live SET proof.
+
 ## 2026-11-11: Ship 0.6.4 (Tock)
 - Loom RR: IndoorDesigen part→mesh still digging; transmorph apply-path drafting (Bag UI HOLD); Water HOLD.
 - Shipped banked: `encode_map_id` CRC32 UTF-32LE + outdoor Map_000100_01_env sun retarget. No new mesh dump yet.

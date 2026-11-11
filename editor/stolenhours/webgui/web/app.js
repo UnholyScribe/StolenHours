@@ -2528,7 +2528,7 @@ async function islHouse() {
       const floors = rows.filter((r) => r.Type === 118);
       const cur = (v.theme && v.theme.designId) || (v.area && v.area.designId) || "";
       cat.innerHTML = `
-        <div class="note" style="margin:4px 0 8px">Preview Apply swaps viewer theme from Loom walls_floors (Diff/Nml/Rse).
+        <div class="note" style="margin:4px 0 8px">Preview Apply swaps viewer theme from Loom walls_floors (Diff/Nml/Rse) + IndoorDesigen shell glbs (00 tex fallback).
           Write-to-save still UNVERIFIED — HOLD. Active: <code>${h(cur || "ide_thatch_00")}</code></div>
         <div class="muted" style="padding:4px 0">Wallpaper (${walls.length}) — click to preview</div>
         ${walls.map((r) => `<button class="vil-list-row ${r.designId === cur ? "on" : ""}" data-theme="${h(r.designId || "")}" title="${h((r.meshes || [])[0] || "")}">

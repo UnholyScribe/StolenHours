@@ -647,9 +647,14 @@ class Backend:
         }
 
     def api_village_theme(self, design_id: str = "ide_thatch_00") -> dict:
-        """Read-only IndoorDesigen theme (walls_floors → Diff/Nml/Rse). Preview only."""
+        """Read-only IndoorDesigen theme (walls_floors → Diff/Nml/Rse + shell glbs). Preview only."""
         from stolenhours import village as vilmod
         return vilmod.theme_for_design(str(design_id or "ide_thatch_00"))
+
+    def api_village_design_preview(self, design_id: str = "ide_thatch_00") -> dict:
+        """Read-only IndoorDesigen → craft3d glb list (Loom mesh pass)."""
+        from stolenhours import village as vilmod
+        return vilmod.design_preview(str(design_id or "ide_thatch_00"))
 
     def api_village_edit(self, action: str, free: bool = False, craft_obj_id: str | None = None,
                          handle: int | None = None, map_id: str = "Map_000100",

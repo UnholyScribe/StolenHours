@@ -1,4 +1,4 @@
-Stolen Hours 0.6.4 — Fantasy Life i save editor
+Stolen Hours 0.6.5 — Fantasy Life i save editor
 ===============================================
 
 1. Unzip this whole folder somewhere (keep StolenHours.exe next to _internal).

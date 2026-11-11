@@ -337,22 +337,82 @@ function applyTheme(theme) {
     designId: theme.designId || activeTheme.designId,
     wall: { ...activeTheme.wall, ...(theme.wall || {}) },
     floor: { ...activeTheme.floor, ...(theme.floor || {}) },
+    preview: theme.preview || activeTheme.preview || null,
+    texFallback00: theme.texFallback00 !== false,
   };
   if (!room) return activeTheme;
-  // Live-refresh shell without full rebuild (catalog Apply preview).
+  // Live-refresh plane shell (catalog Apply preview).
   room.traverse((o) => {
     if (o.userData?.roomWallpaper && o.material) {
       const along = o.geometry?.parameters?.width || 5.5;
       o.material.dispose?.();
       o.material = themeShellMat(wallpaperTex(along), activeTheme.wall);
     }
-    if (o.userData?.roomFloor && o.material) {
+    if (o.userData?.roomFloor && o.material && !o.userData?.roomShellGlb) {
       const floorRepeat = 1.35 * 0.22;
       o.material.dispose?.();
       o.material = themeShellMat(themeFloorTex(floorRepeat), activeTheme.floor);
     }
   });
+  // IndoorDesigen shell glbs (Loom mesh pass) — async; planes remain fallback.
+  loadDesignShellGlbs(activeTheme).catch(() => {});
   return activeTheme;
+}
+
+/** Load wall/floor *_00 craft3d glbs for current design; 00 tex via paintCraft aliases. */
+async function loadDesignShellGlbs(theme = activeTheme) {
+  if (!room || mode !== "indoor") return null;
+  const prev = room.getObjectByName("designShell");
+  if (prev) {
+    room.remove(prev);
+    clearGroup(prev);
+  }
+  const wallRel = theme?.wall?.shell || theme?.preview?.wallShell;
+  const floorRel = theme?.floor?.shell || theme?.preview?.floorShell;
+  if (!wallRel && !floorRel) return null;
+  const group = new THREE.Group();
+  group.name = "designShell";
+  const cell = roomCell || 0.5;
+  const w = (roomHalf?.x || 2.75) * 2;
+  const d = (roomHalf?.z || 2.75) * 2;
+  if (floorRel) {
+    try {
+      const node = await glb(floorRel);
+      node.userData.roomShellGlb = true;
+      node.userData.roomFloor = true;
+      // Fit floor shell to visual pad (N-1 cells); UE cm → already meters in glTF.
+      const box = new THREE.Box3().setFromObject(node);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      if (size.x > 0.01 && size.z > 0.01) {
+        node.scale.set(w / size.x, 1, d / size.z);
+      }
+      node.position.set(0, 0.005, 0);
+      group.add(node);
+    } catch (err) {
+      console.warn("village3d: floor shell", floorRel, err);
+    }
+  }
+  if (wallRel) {
+    try {
+      const node = await glb(wallRel);
+      node.userData.roomShellGlb = true;
+      node.userData.roomWallpaper = true;
+      // Stand-in: park a sample wall panel on the north face until full parts layout lands.
+      const box = new THREE.Box3().setFromObject(node);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const targetH = 2.55;
+      const s = size.y > 0.01 ? targetH / size.y : 1;
+      node.scale.setScalar(s);
+      node.position.set(0, 0, -d / 2 + cell * 0.05);
+      group.add(node);
+    } catch (err) {
+      console.warn("village3d: wall shell", wallRel, err);
+    }
+  }
+  if (group.children.length) room.add(group);
+  return group;
 }
 
 /** Loom room_env00 indoor lights (CONFIRMED): warm Dir 3 + ceiling Sphere 8. */
@@ -2161,6 +2221,7 @@ async function show(container, placed, opts = {}) {
     if (compassBounds) clipIslandEnvToPad(compassBounds);
   } else {
     size = buildIndoorRoom(opts.area);
+    loadDesignShellGlbs(activeTheme).catch(() => {});
     // My House craft axes vs door (Screenshot 220942): door / open front = +Z,
     // left-right = iy (high iy = left wall), depth = ix (ix=0 = back wall).
     // Bucket (0,10) → back-left; Tropical Bed (2,1) → right wall. Earlier ix→X
@@ -2403,6 +2464,7 @@ window.Village3D = {
   validateFootprintAt, setExploreMode,
   isExploreMode() { return !!exploreMode; },
   applyTheme,
+  loadDesignShellGlbs,
   getTheme() { return activeTheme; },
   setWallpaper(texRel) {
     if (!room) return;
