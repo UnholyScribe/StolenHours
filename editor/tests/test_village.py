@@ -120,6 +120,8 @@ def test_map_id_numeric_trio():
     assert village.MAP_ID_NUMERIC[MAP_BASE] == 1807587003
     assert village.MAP_ID_NUMERIC[MAP_MYHOUSE] == 535592167
     assert village.MAP_ID_NUMERIC["NPCEmptyRoom_00"] == 616711470
+    assert village.encode_map_id(MAP_BASE) == 1807587003
+    assert village.encode_map_id("NPCEmptyRoom_01") == 2625512011
     assert village.ISLAND_VOXEL["xy"] == 50 and village.ISLAND_VOXEL["z"] == 150
     assert village.STATUS_BITFLAGS["shave"]["mask"] == 1
 

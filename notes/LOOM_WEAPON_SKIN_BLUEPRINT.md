@@ -18,6 +18,14 @@ Example target: Claymore (`ItemId` unchanged) + Berserker sword visual.
 
 Tock will wire UI once Loom banks a real override path. Do **not** invent a fake skin field.
 
+### Loom Dig status (2026-11-10 — tick 24)
+
+- **Dig A CONFIRMED/DISPROVEN:** no vanilla save skin field. Chain ItemId→modelID→EquipModelList→mdl_wpn*. Persist needs mod hook / sidecar.
+- **Dig B pair:** Iron Claymore `iwp03000040` / `mdl_wpn000204_00` ↔ Dark Dragon Buster `iwp03000230` / `mdl_wpn000215_00` (Type 12). Both `basemat_chara_wepon_00`.
+- **Dig C:** MVP = retexture donor wpn + mod-hook persist. Live GET ViewEquipModelInfoSet CONFIRMED; SET weapon-slot NAME remap UNVERIFIED.
+- Dumps: `agents/Loom/sandbox/weapon_skin/` + `knowledge/WEAPON_SKIN_SYSTEM.md`. **No Bag skin UI until apply path agreed.**
+
+
 ---
 
 ## 2. Dig A — does the game already support appearance ≠ ItemId?

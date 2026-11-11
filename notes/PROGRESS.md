@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-11-11: Ship 0.6.4 (Tock)
+- Loom RR: IndoorDesigen part→mesh still digging; transmorph apply-path drafting (Bag UI HOLD); Water HOLD.
+- Shipped banked: `encode_map_id` CRC32 UTF-32LE + outdoor Map_000100_01_env sun retarget. No new mesh dump yet.
+
+## 2026-11-11: Tick 31 — mapId encode CONFIRMED (Tock)
+- Loom: `mapId` = CRC32(UTF-32LE). Wired `village.encode_map_id`; FINDINGS updated; NPCEmptyRoom_01=2625512011.
+- House look spine + transmorph catalog banked by Loom — no Bag skin UI until apply path; IndoorDesigen Path next Emperor pass.
+- Buddy houses not editable early (no new place pairs). Dig CLOSED; Water HOLD stands.
+
+## 2026-11-10: Tick 24 — outdoor light P2 + transmorph bank (Tock)
+- Loom: Dig offline leftovers CLOSED; Water/Road Hagram gated early — water HOLD stands.
+- Transmorph Dig A/B/C banked — no Bag skin UI until apply path agreed (sidecar/mod hook).
+- Village outdoor sun retargeted toward Map_000100_01_env (#F0DBC5 / SkyLight stand-in). Map dual-tex mats still open.
+- Chloe ACK island track ownership.
+
 ## 2026-11-10: Ship 0.6.3 (Tock)
 - House P0 theme (designId Diff/Nml/Rse + floor Vertex_Color + room_env00) + Dig peel-only + Apply preview.
 - pytest 142; portable_check clean.

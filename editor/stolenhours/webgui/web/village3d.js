@@ -412,11 +412,13 @@ function setup() {
   ctl.maxDistance = 90;
   ctl.maxPolarAngle = Math.PI * 0.72; // enough pitch to read island cliffs / skirts
   ctl.minPolarAngle = 0.12;
-  // Outdoor Customization refs: soft, bright, short shadows — not hard midday sun.
-  const ambient = new THREE.AmbientLight(0xe8f2ff, 0.72);
+  // Outdoor ≈ Map_000100_01_env (Loom LIGHTING_PIPELINE CONFIRMED):
+  // Dir 12.8 warm #F0DBC5; SkyLight≈2; fog stand-in OK. Three intensities scaled, not 1:1 UE.
+  const ambient = new THREE.AmbientLight(0xe8f2ff, 0.55);
   scene.add(ambient);
-  const sun = new THREE.DirectionalLight(0xfff6e8, 0.95);
-  sun.position.set(14, 40, 10);
+  const sun = new THREE.DirectionalLight(0xf0dbc5, 2.35);
+  // approx_forward (−0.366, −0.211, −0.906) → light comes from opposite
+  sun.position.set(18, 32, 28);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.near = 1;
@@ -429,10 +431,10 @@ function setup() {
   sun.shadow.normalBias = 0.04;
   sun.shadow.radius = 3;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xb8d8f5, 0.45);
-  fill.position.set(-14, 18, -8);
+  const fill = new THREE.DirectionalLight(0xa1ace5, 0.55); // cool Map_000100_env Dir stand-in
+  fill.position.set(-16, 20, -10);
   scene.add(fill);
-  const hemi = new THREE.HemisphereLight(0xc8e6ff, 0x9a7a55, 0.42);
+  const hemi = new THREE.HemisphereLight(0xc8e6ff, 0x9a7a55, 0.85); // SkyLight≈2 stand-in
   scene.add(hemi);
   ambient.userData._base = ambient.intensity;
   sun.userData._base = sun.intensity;
